@@ -80,18 +80,7 @@ fun EventsScreen(
                     color = Color.Black,
                 )
 
-                IconButton(
-                    onClick = {showSettings = true},
-                    modifier = Modifier
-                        .size(50.dp)
-                        .clip(CircleShape),
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = Color(0xFFEE9528)
-                    )
-
-                ){
-
-                }
+                SettingsButton(onClick = {showSettings = true})
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -148,6 +137,22 @@ fun EventsScreen(
 @Composable
 fun EventsScreenPreview() {
     EventsScreen( onBackClick = {} )
+}
+
+@Composable
+fun SettingsButton(onClick: () -> Unit) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .size(50.dp)
+            .clip(CircleShape),
+        colors = IconButtonDefaults.iconButtonColors(
+            containerColor = Color(0xFFEE9528)
+        )
+
+    ){
+
+    }
 }
 
 @Composable
