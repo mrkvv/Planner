@@ -52,6 +52,9 @@ import org.ikbey.planner.*
 import org.ikbey.planner.White
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
+import androidx.compose.material3.Icon
+import org.ikbey.planner.Icons
+
 @Composable
 fun HomeScreen(
     onMonthClick: () -> Unit,
@@ -67,7 +70,6 @@ fun HomeScreen(
             .fillMaxSize()
             .background(Yellow)
     ) {
-
         MonthText()
         DaysScrollList(
             selectedDay = selectedDay,
