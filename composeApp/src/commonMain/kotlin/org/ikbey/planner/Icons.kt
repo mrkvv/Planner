@@ -33,18 +33,14 @@ object Icons {
     val bigStick: ImageVector
         @Composable
         get() = vectorResource(Res.drawable.ic_big_sticky_notes)
+
+    val plus: ImageVector
+        @Composable
+        get() = vectorResource(Res.drawable.ic_plus)
 }
 
 enum class IconType {
-    FILTER,
-    SETTINGS_OPEN,
-    SETTINGS_CLOSED,
-    TRAINING,
-    TRASH,
-
-    LIL_STICK,
-
-    BIG_STICK
+    FILTER, SETTINGS_OPEN, SETTINGS_CLOSED, TRAINING, TRASH, LIL_STICK, BIG_STICK, PLUS
 
 }
 
@@ -58,5 +54,6 @@ fun getIcon(iconType: IconType): ImageVector {
         IconType.TRASH -> Icons.trash
         IconType.LIL_STICK -> Icons.lilStick
         IconType.BIG_STICK -> Icons.bigStick
+        IconType.PLUS -> Icons.plus
     }
 }

@@ -35,6 +35,19 @@ class CalendarManager {
         }
     }
 
+    fun getDayOfWeekName(dayOfWeek: Int): String {
+        return when (dayOfWeek) {
+            1 -> "Понедельник"
+            2 -> "Вторник"
+            3 -> "Среда"
+            4 -> "Четверг"
+            5 -> "Пятница"
+            6 -> "Суббота"
+            7 -> "Воскресенье"
+            else -> ""
+        }
+    }
+
     /** Упрощенный алгоритм Zeller's congruence. Возвращает число от 1 до 7, где 1 - пн, 2 - вт и т.д.*/
     fun calculateDayOfWeek(year: Int, month: Int, day: Int): Int {
         var m = month
