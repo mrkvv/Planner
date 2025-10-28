@@ -1,0 +1,148 @@
+CREATE TABLE faculties (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    abbr TEXT NOT NULL
+);
+
+CREATE TABLE groups (
+    id INTEGER PRIMARY KEY,
+    faculty_id INTEGER NOT NULL,
+    name TEXT NOT NULL
+);
+
+CREATE TABLE calendar_events (
+    id INTEGER PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    date TEXT NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    location TEXT,
+    creator TEXT NOT NULL,
+    calendar_name TEXT NOT NULL
+);
+
+CREATE TABLE user_schedule (
+    id INTEGER PRIMARY KEY,
+    group_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    weekday INTEGER NOT NULL,
+    subject TEXT NOT NULL,
+    type TEXT NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    teacher TEXT,
+    audithory TEXT
+);
+
+CREATE TABLE user_notes (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    lesson_id INTEGER,
+    date TEXT,
+    header TEXT,
+    note TEXT,
+    created_at TEXT,
+    updated_at TEXT
+);
+
+CREATE TABLE user_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
+
+-- Запросы для faculties
+selectAllFaculties:
+SELECT faculties.* FROM faculties;
+
+insertFaculty:
+INSERT OR REPLACE INTO faculties (id, name, abbr)
+VALUES (?, ?, ?);
+
+deleteAllFaculties:
+DELETE FROM faculties;
+
+-- Запросы для groups
+selectAllGroups:
+SELECT groups.* FROM groups;
+
+selectGroupsByFaculty:
+SELECT groups.* FROM groups WHERE faculty_id = ?;
+
+insertGroup:
+INSERT OR REPLACE INTO groups (id, faculty_id, name)
+VALUES (?, ?, ?);
+
+deleteAllGroups:
+DELETE FROM groups;
+
+-- Запросы для calendar_events
+selectAllCalendarEvents:
+SELECT calendar_events.* FROM calendar_events;
+
+selectCalendarEventsByDate:
+SELECT calendar_events.* FROM calendar_events WHERE date = ?;
+
+selectCalendarEventsByDateRange:
+SELECT calendar_events.* FROM calendar_events WHERE date BETWEEN ? AND ?;
+
+insertCalendarEvent:
+INSERT OR REPLACE INTO calendar_events
+(id, title, description, date, start_time, end_time, location, creator, calendar_name)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteCalendarEvent:
+DELETE FROM calendar_events WHERE id = ?;
+
+deleteAllCalendarEvents:
+DELETE FROM calendar_events;
+
+-- Запросы для user_schedule
+selectAllUserSchedule:
+SELECT user_schedule.* FROM user_schedule;
+
+selectUserScheduleByDate:
+SELECT user_schedule.* FROM user_schedule WHERE date = ?;
+
+selectUserScheduleByDateRange:
+SELECT user_schedule.* FROM user_schedule WHERE date BETWEEN ? AND ?;
+
+insertUserSchedule:
+INSERT OR REPLACE INTO user_schedule
+(id, group_id, date, weekday, subject, type, start_time, end_time, teacher, audithory)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteUserSchedule:
+DELETE FROM user_schedule;
+
+-- Запросы для user_notes
+selectAllUserNotes:
+SELECT user_notes.* FROM user_notes;
+
+selectUserNotesByLesson:
+SELECT user_notes.* FROM user_notes WHERE lesson_id = ?;
+
+selectUserNotesByDate:
+SELECT user_notes.* FROM user_notes WHERE date = ?;
+
+insertUserNote:
+INSERT OR REPLACE INTO user_notes
+(id, user_id, lesson_id, date, header, note, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteUserNote:
+DELETE FROM user_notes WHERE id = ?;
+
+deleteAllUserNotes:
+DELETE FROM user_notes;
+
+-- Запросы для user_settings
+getSetting:
+SELECT user_settings.value FROM user_settings WHERE key = ?;
+
+setSetting:
+INSERT OR REPLACE INTO user_settings (key, value)
+VALUES (?, ?);
+
+deleteSetting:
+DELETE FROM user_settings WHERE key = ?;

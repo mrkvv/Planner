@@ -2,6 +2,9 @@ package org.ikbey.planner.dataBase
 
 import kotlinx.serialization.Serializable
 
+//Тут все классы для сериализации JSON в котлин код.
+//Нужны для чтения и из облачной БД и из локальной SQLDelight
+
 @Serializable
 data class Faculty(
     val id: Int,
@@ -20,12 +23,12 @@ data class Group(
 data class Schedule(
     val id: Int,
     val group_id: Int,
-    val date: String? = null,
-    val weekday: Int? = null,
+    val date: String,
+    val weekday: Int,
     val subject: String,
-    val type: String? = null,
-    val start_time: String? = null,
-    val end_time: String? = null,
+    val type: String,
+    val start_time: String,
+    val end_time: String,
     val teacher: String? = null,
     val audithory: String? = null
 )
@@ -48,9 +51,9 @@ data class CalendarEvent(
     val title: String,
     val description: String? = null,
     val date: String,
-    val start_time: String? = null,
-    val end_time: String? = null,
+    val start_time: String,
+    val end_time: String,
     val location: String? = null,
-    val creator: String? = null,
-    val calendar_name: String? = null
+    val creator: String,
+    val calendar_name: String
 )

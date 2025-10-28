@@ -1,0 +1,57 @@
+CREATE TABLE faculties (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    abbr VARCHAR(50)
+);
+
+CREATE TABLE groups (
+    id SERIAL PRIMARY KEY,
+    faculty_id INTEGER REFERENCES faculties(id),
+    name VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE schedule (
+    id SERIAL PRIMARY KEY,
+    group_id INTEGER REFERENCES groups(id),
+    date DATE,
+    weekday INTEGER CHECK (weekday BETWEEN 1 AND 6),
+    subject VARCHAR(255) NOT NULL,
+    type VARCHAR(50),
+    start_time TIME,
+    end_time TIME,
+    teacher VARCHAR(255),
+    audithory VARCHAR(50)
+);
+
+CREATE TABLE cached_api_calls (
+    id SERIAL PRIMARY KEY,
+    endpoint VARCHAR(255) NOT NULL,
+    params TEXT,
+    response JSONB,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE calendar_events (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    date DATE NOT NULL,
+    start_time TIME,
+    end_time TIME,
+    location VARCHAR(255),
+    creator VARCHAR(255),
+    calendar_name VARCHAR(100)
+);
+
+ALTER TABLE faculties ENABLE ROW LEVEL SECURITY;
+ALTER TABLE groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE schedule ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cached_api_calls ENABLE ROW LEVEL SECURITY;
+ALTER TABLE calendar_events ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all operations" ON faculties FOR ALL USING (true);
+CREATE POLICY "Allow all operations" ON groups FOR ALL USING (true);
+CREATE POLICY "Allow all operations" ON schedule FOR ALL USING (true);
+CREATE POLICY "Allow all operations" ON cached_api_calls FOR ALL USING (true);
+CREATE POLICY "Allow all operations" ON calendar_events FOR ALL USING (true);
