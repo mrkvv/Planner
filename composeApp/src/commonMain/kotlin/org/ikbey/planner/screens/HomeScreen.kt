@@ -3,6 +3,7 @@ package org.ikbey.planner.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -49,11 +51,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.ikbey.planner.*
-import org.ikbey.planner.White
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
-import androidx.compose.material3.Icon
 import org.ikbey.planner.Icons
+import androidx.compose.material3.Icon
+
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.delay
+
 
 @Composable
 fun HomeScreen(
@@ -61,7 +67,13 @@ fun HomeScreen(
     onEventsClick: () -> Unit,
     onAddNoteClick: (NoteData) -> Unit
 ) {
-    var selectedDay by remember { mutableStateOf(1) }
+    val calendarManager = remember { CalendarManager() }
+    val currentDate = PlatformDate()
+
+    // Всегда используем текущую дату
+    var selectedYear by remember { mutableStateOf(currentDate.year) }
+    var selectedMonth by remember { mutableStateOf(currentDate.month) }
+    var selectedDay by remember { mutableStateOf(currentDate.day) }
     var showBottomSheet by remember { mutableStateOf(false) }
     //var showBottomSheet = true
 
@@ -70,60 +82,101 @@ fun HomeScreen(
             .fillMaxSize()
             .background(Yellow)
     ) {
-        MonthText()
+        MonthText(year = selectedYear, month = selectedMonth, calendarManager = calendarManager)
         DaysScrollList(
+            year = selectedYear,
+            month = selectedMonth,
             selectedDay = selectedDay,
             onDayClick = { day -> selectedDay = day }
         )
-        DayWeekText()
+        DayWeekText(
+            year = selectedYear,
+            month = selectedMonth,
+            day = selectedDay,
+            calendarManager = calendarManager
+        )
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = 180.dp, start = 290.dp)
         ) {
-            TodayBox()
+            TodayBox(
+                isToday = calendarManager.isToday(selectedYear, selectedMonth, selectedDay)
+            )
         }
-
 
         AddButton { showBottomSheet = true }
 
-
         if (showBottomSheet) {
-            Column(
-                modifier = Modifier.fillMaxSize()
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.7f))
+                    .clickable { showBottomSheet = false }
             ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                )
-                BottomSheetMenu(
-                    onDismiss = { showBottomSheet = false },
-                    onMonthClick = onMonthClick,
-                    onEventsClick = onEventsClick,
-                    onAddNoteClick = onAddNoteClick
-                )
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Bottom
+                ) {
+                    BottomSheetMenu(
+                        onDismiss = { showBottomSheet = false },
+                        onMonthClick = onMonthClick,
+                        onEventsClick = onEventsClick,
+                        onAddNoteClick = onAddNoteClick
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-fun MonthText() {
+fun MonthText(
+    year: Int,
+    month: Int,
+    calendarManager: CalendarManager
+) {
+    val monthName = calendarManager.getMonthName(month)
+
     Text(
-        text = "Сентябрь",
+        text = monthName, // Теперь динамическое название месяца
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 50.dp, start = 25.dp),
         textAlign = TextAlign.Start,
+        fontFamily = getInterFont(InterFontType.REGULAR),
         fontSize = 26.sp
     )
 }
 
 @Composable
-fun DaysScrollList(selectedDay: Int = 1, onDayClick: (Int) -> Unit = {}) {
+fun DaysScrollList(
+    year: Int,
+    month: Int,
+    selectedDay: Int,
+    onDayClick: (Int) -> Unit = {}
+) {
+    val calendarManager = remember { CalendarManager() }
+    val daysInMonth = calendarManager.getDaysAmountInMonth(year, month)
+
     val scrollState = rememberScrollState()
+    val density = LocalDensity.current
+
+    // Эффект для автоматической прокрутки к выбранному дню
+    LaunchedEffect(selectedDay) {
+        // Ждем пока Layout будет полностью скомпонован
+        delay(100)
+
+        // Рассчитываем позицию прокрутки на основе реальных размеров
+        // Ширина DayItem: 40.dp + отступ 6.dp = 46.dp на каждый элемент
+        val itemWidthWithSpacing = with(density) { 46.dp.roundToPx() }
+        val scrollPosition = (selectedDay - 1) * itemWidthWithSpacing
+
+        // Прокручиваем с небольшим отступом от края
+        val adjustedPosition = scrollPosition - with(density) { 100.dp.roundToPx() }
+        scrollState.animateScrollTo(adjustedPosition.coerceAtLeast(0))
+    }
 
     Row(
         modifier = Modifier
@@ -131,7 +184,7 @@ fun DaysScrollList(selectedDay: Int = 1, onDayClick: (Int) -> Unit = {}) {
             .padding(horizontal = 16.dp, vertical = 110.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        for (day in 1..30) {
+        for (day in 1..daysInMonth) {
             val isSelected = day == selectedDay
             DayItem(
                 day = day,
@@ -161,43 +214,58 @@ fun DayItem(day: Int, isSelected: Boolean = false, onClick: () -> Unit = {}) {
     ) {
         Text(
             text = day.toString(),
+            fontFamily = if (isSelected) getInterFont(InterFontType.EXTRA_BOLD) else getInterFont(InterFontType.REGULAR),
             fontSize = 24.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
             color = textColor
         )
     }
 }
 
 @Composable
-fun DayWeekText() {
+fun DayWeekText(
+    year: Int,
+    month: Int,
+    day: Int,
+    calendarManager: CalendarManager
+) {
+    val dayOfWeek = calendarManager.getDayOfWeekName(calendarManager.calculateDayOfWeek(year, month, day))
+
     Text(
-        text = "Понедельник, 1",
+        text = "$dayOfWeek, $day", // Динамические день недели и число
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 180.dp, start = 25.dp),
         textAlign = TextAlign.Start,
+        fontFamily = getInterFont(InterFontType.REGULAR),
         fontSize = 24.sp
     )
 }
 
+
+
+
+
 @Composable
-fun TodayBox() {
-    Box(
-        modifier = Modifier
-            .width(103.dp)
-            .height(28.dp)
-            .background(
-                color = LightOrange,
-                shape = RoundedCornerShape(15.dp)
+fun TodayBox(isToday: Boolean) {
+    if (isToday) { // Показываем только если это сегодня
+        Box(
+            modifier = Modifier
+                .width(103.dp)
+                .height(28.dp)
+                .background(
+                    color = LightOrange,
+                    shape = RoundedCornerShape(15.dp)
+                )
+                .padding(horizontal = 1.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Сегодня",
+                fontFamily = getInterFont(InterFontType.REGULAR),
+                fontSize = 20.sp,
+                color = DarkOrange
             )
-            .padding(horizontal = 1.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "Сегодня",
-            fontSize = 20.sp,
-            color = DarkOrange
-        )
+        }
     }
 }
 
@@ -215,10 +283,10 @@ fun AddButton(onClick: () -> Unit) {
             shape = CircleShape,
             modifier = Modifier.size(70.dp)
         ) {
-            Text(
-                text = "+",
-                fontSize = 60.sp,
-                color = White
+            Icon(
+                imageVector = Icons.plus,
+                contentDescription = "+",
+                tint = White
             )
         }
     }
@@ -270,6 +338,7 @@ fun BottomSheetMenu(
                 text = "Интервал",
                 modifier = Modifier
                     .padding(top = 10.dp, start = 190.dp),
+                fontFamily = getInterFont(InterFontType.REGULAR),
                 fontSize = 20.sp,
                 color = DarkGreen
             )
@@ -293,6 +362,7 @@ fun BottomSheetMenu(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 16.dp),
+            fontFamily = getInterFont(InterFontType.REGULAR),
             fontSize = 24.sp
         )
 
@@ -337,6 +407,7 @@ fun BottomSheetMenu(
                 )
                 Text(
                     "Уведомление",
+                    fontFamily = getInterFont(InterFontType.REGULAR),
                     fontSize = 20.sp,
                     color = DarkGreen
                 )
@@ -363,6 +434,7 @@ fun BottomSheetMenu(
             ) {
                 Text(
                     "Добавить",
+                    fontFamily = getInterFont(InterFontType.BOLD),
                     fontSize = 20.sp,
                     color = DarkOrange
                 )
@@ -387,6 +459,7 @@ fun UnifiedTimeInputField(
     ) {
         Text(
             text = "Время",
+            fontFamily = getInterFont(InterFontType.REGULAR),
             fontSize = 24.sp
         )
 
@@ -409,7 +482,7 @@ fun UnifiedTimeInputField(
                     placeholder = "__:__"
                 )
 
-                Text("—", color = LightGray, fontSize = 20.sp)
+                Text("-", color = LightGray, fontFamily = getInterFont(InterFontType.SEMI_BOLD), fontSize = 20.sp)
 
                 IntervalTimePart(
                     value = endTime,
@@ -430,12 +503,15 @@ fun UnifiedTimeInputField(
     }
 }
 
+
 @Composable
 fun SingleTimeField(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isFocused by remember { mutableStateOf(false) }
+
     Box(
         modifier = modifier
             .background(
@@ -448,32 +524,30 @@ fun SingleTimeField(
         BasicTextField(
             value = value,
             onValueChange = { newText ->
-                val formatted = formatTimeInput(newText)
-                if (formatted.length <= 5) {
-                    onValueChange(formatted)
-                }
+                val digits = newText.filter { it.isDigit() }.take(4)
+                val formatted = if (isFocused) digits else formatTimeFinal(digits)
+                onValueChange(formatted)
             },
             modifier = Modifier.fillMaxWidth(),
             textStyle = androidx.compose.ui.text.TextStyle(
+                fontFamily = getInterFont(InterFontType.SEMI_BOLD),
                 fontSize = 20.sp,
                 textAlign = TextAlign.Center,
-                color = Color.Black
-            ),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            decorationBox = { innerTextField ->
-                if (value.isEmpty()) {
-                    Text(
-                        "__:__",
-                        color = LightGray,
-                        fontSize = 20.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                innerTextField()
-            }
+                color = DarkOrange
+            )
         )
+
+        // Плейсхолдер поверх BasicTextField
+        if (value.isEmpty()) {
+            Text(
+                "__:__",
+                color = LightGray,
+                fontFamily = getInterFont(InterFontType.SEMI_BOLD),
+                fontSize = 20.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 
@@ -487,59 +561,42 @@ fun IntervalTimePart(
         modifier = Modifier
             .width(65.dp)
             .fillMaxHeight()
-            .background(
-                color = Color.Transparent
-            )
+            .background(Color.Transparent)
             .padding(horizontal = 4.dp),
         contentAlignment = Alignment.Center
     ) {
         BasicTextField(
-            value = value,
+            value = if (value.length == 4) "${value.take(2)}:${value.takeLast(2)}" else value,
             onValueChange = { newText ->
-                val formatted = formatTimeInput(newText)
-                if (formatted.length <= 5) {
-                    onValueChange(formatted)
-                }
+                val digits = newText.filter { it.isDigit() }.take(4)
+                onValueChange(digits)
             },
             modifier = Modifier.fillMaxWidth(),
             textStyle = androidx.compose.ui.text.TextStyle(
+                fontFamily = getInterFont(InterFontType.SEMI_BOLD),
                 fontSize = 20.sp,
                 textAlign = TextAlign.Center,
-                color = Color.Black
-            ),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            decorationBox = { innerTextField ->
-                if (value.isEmpty()) {
-                    Text(
-                        placeholder,
-                        color = LightGray,
-                        fontSize = 20.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                innerTextField()
-            }
+                color = DarkOrange
+            )
         )
+
+        if (value.isEmpty()) {
+            Text(
+                placeholder,
+                color = LightGray,
+                fontFamily = getInterFont(InterFontType.SEMI_BOLD),
+                fontSize = 20.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 
-fun formatTimeInput(input: String): String {
-    val digitsOnly = input.filter { it.isDigit() }
-    val limitedDigits = digitsOnly.take(4)
-
-    return when {
-        limitedDigits.isEmpty() -> ""
-        limitedDigits.length <= 2 -> limitedDigits
-        else -> {
-            val hours = limitedDigits.take(2)
-            val minutes = limitedDigits.drop(2)
-
-            val validHours = hours.toIntOrNull()?.coerceIn(0, 23)?.toString()?.padStart(2, '0') ?: hours
-            val validMinutes = minutes.toIntOrNull()?.coerceIn(0, 59)?.toString()?.padStart(2, '0') ?: minutes
-            "$validHours:$validMinutes"
-        }
+fun formatTimeFinal(digits: String): String {
+    return when (digits.length) {
+        4 -> "${digits.take(2)}:${digits.takeLast(2)}"
+        else -> digits
     }
 }
 
@@ -557,6 +614,7 @@ fun LocationField(
     ) {
         Text(
             text = "Место",
+            fontFamily = getInterFont(InterFontType.REGULAR),
             fontSize = 20.sp,
             color = DarkGreen,
         )
@@ -577,7 +635,8 @@ fun LocationField(
                 onValueChange = onValueChange,
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = androidx.compose.ui.text.TextStyle(
-                    fontSize = 16.sp,
+                    fontFamily = getInterFont(InterFontType.REGULAR),
+                    fontSize = 20.sp,
                     color = Color.Black
                 ),
                 singleLine = true,
@@ -586,6 +645,7 @@ fun LocationField(
                         Text(
                             "Место проведения",
                             color = LightGray,
+                            fontFamily = getInterFont(InterFontType.REGULAR),
                             fontSize = 20.sp
                         )
                     }
@@ -621,6 +681,7 @@ fun SimpleInputField(
                 .fillMaxSize()
                 .onFocusChanged { isFocused = it.isFocused },
             textStyle = androidx.compose.ui.text.TextStyle(
+                fontFamily = getInterFont(InterFontType.REGULAR),
                 fontSize = 20.sp,
                 color = Color.Black
             ),
@@ -632,12 +693,14 @@ fun SimpleInputField(
                                 placeholder,
                                 modifier = Modifier.padding(top = 5.dp, start = 5.dp),
                                 color = LightGray,
+                                fontFamily = getInterFont(InterFontType.MEDIUM),
                                 fontSize = 24.sp
                             )
                             Text(
                                 "Введите текст...",
                                 modifier = Modifier.padding(top = 4.dp, start = 5.dp),
                                 color = LightGray,
+                                fontFamily = getInterFont(InterFontType.REGULAR),
                                 fontSize = 20.sp
                             )
                         }
@@ -649,6 +712,7 @@ fun SimpleInputField(
                                     Text(
                                         firstLine,
                                         color = Color.Black,
+                                        fontFamily = getInterFont(InterFontType.MEDIUM),
                                         fontSize = 24.sp,
                                         fontWeight = FontWeight.Normal
                                     )
@@ -658,6 +722,7 @@ fun SimpleInputField(
                                     Text(
                                         remainingText,
                                         color = Color.Black,
+                                        fontFamily = getInterFont(InterFontType.REGULAR),
                                         fontSize = 20.sp,
                                         modifier = Modifier.padding(top = 4.dp)
                                     )
