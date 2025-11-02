@@ -36,10 +36,9 @@ class SyncManager(
     /** Любая смена группы = полная синхронизация (не знаю стоит ли прям так делать, если что уберем) */
     suspend fun setGroupId(groupId: Int) {
         localDb.setSetting(GROUP_ID_DB_KEY, groupId.toString())
-        performFullSync()
+        forceSync()
     }
 
-    @OptIn(ExperimentalTime::class)
     private suspend fun performFullSync() {
         try {
             val remoteFaculties = remoteDb.getAllFaculties()
@@ -58,8 +57,6 @@ class SyncManager(
             val remoteSchedule = remoteDb.getScheduleByGroup(groupId?.toInt() ?: 0)
             localDb.deleteUserSchedule()
             remoteSchedule.forEach { localDb.insertUserSchedule(it) }
-
-            setLastSyncTime(Clock.System.now().toEpochMilliseconds())
         } catch (e: Exception) {
             println("Ошибка в SyncManager.performFullSync(): ${e.message}")
             throw e
