@@ -56,3 +56,10 @@ data class CalendarEvent(
     val creator: String,
     val calendar_name: String
 )
+
+@Serializable
+data class StickyNote(
+    val id: Int,
+    val header: String,
+    val note: String
+)

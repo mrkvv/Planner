@@ -11,7 +11,7 @@ import kotlinx.serialization.json.Json
  * # Для его работы нужно вставить API-ключ */
 class SupabaseRepository {
     private val baseUrl = "https://pjcbyabqlgpjvkozojvc.supabase.co/rest/v1"
-    private val apiKey = "СЮДА АПИ КЛЮЧ НАДО"
+    private val apiKey = "API_KEY"
 
     private val client = HttpClient {
         install(ContentNegotiation) {
@@ -32,9 +32,9 @@ class SupabaseRepository {
         }
     }
 
-    suspend fun getAllGroups(): List<Group> {
+    suspend fun getAllGroupsByFaculty(facultyId: Int): List<Group> {
         return try {
-            val response = client.get("$baseUrl/groups?apikey=$apiKey")
+            val response = client.get("$baseUrl/groups?apikey=$apiKey&faculty_id=eq.$facultyId&select=*")
             response.body()
         } catch (e: Exception) {
             println("Ошибка в SupabaseRepository.getAllGroups(): ${e.message}")

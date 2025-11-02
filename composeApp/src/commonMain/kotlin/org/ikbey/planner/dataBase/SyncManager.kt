@@ -45,9 +45,13 @@ class SyncManager(
             localDb.deleteAllFaculties()
             remoteFaculties.forEach { localDb.insertFaculty(it) }
 
-            val remoteGroups = remoteDb.getAllGroups()
             localDb.deleteAllGroups()
-            remoteGroups.forEach { localDb.insertGroup(it) }
+            remoteFaculties.forEach { faculty ->
+                val groupsForFaculty = remoteDb.getAllGroupsByFaculty(faculty.id)
+                groupsForFaculty.forEach { group ->
+                    localDb.insertGroup(group)
+                }
+            }
 
             val remoteCalendarEvents = remoteDb.getAllCalendarEvents()
             localDb.deleteAllCalendarEvents()

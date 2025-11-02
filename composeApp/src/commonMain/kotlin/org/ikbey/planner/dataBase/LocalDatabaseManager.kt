@@ -250,14 +250,14 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
     }
 
     // ---------------- ЗАМЕТКИ ПОЛЬЗОВАТЕЛЯ (и только) ------------------
-    suspend fun getUserNotes(): List<Note> {
+    suspend fun getAllUserNotes(): List<Note> {
         return withContext(Dispatchers.IO) {
             query.selectAllUserNotes().executeAsList().map { note ->
                 Note(
                     id = note.id.toInt(),
                     lesson_id = note.lesson_id?.toInt(),
                     date = note.date,
-                    header = note.header_, //хз почему нижнее подчеркивание, так сгенерировалось почемуто
+                    header = note.header_,
                     note = note.note,
                     created_at = note.created_at,
                     updated_at = note.updated_at
@@ -321,6 +321,64 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
     suspend fun deleteAllUserNotes() {
         withContext(Dispatchers.IO) {
             query.deleteAllUserNotes()
+        }
+    }
+
+    // ---------------- STICKY NOTES ------------------
+    suspend fun getAllStickyNotes(): List<StickyNote> {
+        return withContext(Dispatchers.IO) {
+            query.selectAllUserStickyNotes().executeAsList().map { note ->
+                StickyNote(
+                    id = note.id.toInt(),
+                    header = note.header_,
+                    note = note.note
+                )
+            }
+        }
+    }
+
+    suspend fun getStickyNoteById(id: Int): List<StickyNote> {
+        return withContext(Dispatchers.IO) {
+            query.getUserStickyNoteById(id.toLong()).executeAsList().map { note ->
+                StickyNote(
+                    id = note.id.toInt(),
+                    header = note.header_,
+                    note = note.note
+                )
+            }
+        }
+    }
+
+    /** Обновляет, если существует такой id, иначе создает новую */
+    suspend fun updateStickyNote(stickyNote: StickyNote) {
+        withContext(Dispatchers.IO) {
+            query.insertOrReplaceStickyNote(
+                id = stickyNote.id.toLong(),
+                header_ = stickyNote.header,
+                note = stickyNote.note,
+            )
+        }
+    }
+
+    /** Создает новую с autoincrement id */
+    suspend fun insertStickyNote(stickyNote: StickyNote) {
+        withContext(Dispatchers.IO) {
+            query.insertStickyNote(
+                header_ = stickyNote.header,
+                note = stickyNote.note,
+            )
+        }
+    }
+
+    suspend fun deleteStickyNote(id: Int) {
+        withContext(Dispatchers.IO) {
+            query.deleteStickyNote(id.toLong())
+        }
+    }
+
+    suspend fun deleteAllStickyNotes() {
+        withContext(Dispatchers.IO) {
+            query.deleteAllStickyNotes()
         }
     }
 
