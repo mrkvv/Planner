@@ -39,6 +39,7 @@ class SyncManager(
         performFullSync()
     }
 
+    @OptIn(ExperimentalTime::class)
     private suspend fun performFullSync() {
         try {
             val remoteFaculties = remoteDb.getAllFaculties()
@@ -57,6 +58,8 @@ class SyncManager(
             val remoteSchedule = remoteDb.getScheduleByGroup(groupId?.toInt() ?: 0)
             localDb.deleteUserSchedule()
             remoteSchedule.forEach { localDb.insertUserSchedule(it) }
+
+            setLastSyncTime(Clock.System.now().toEpochMilliseconds())
         } catch (e: Exception) {
             println("Ошибка в SyncManager.performFullSync(): ${e.message}")
             throw e
