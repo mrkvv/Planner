@@ -33,13 +33,33 @@ class SyncManager(
         return localDb.getSetting(GROUP_ID_DB_KEY)
     }
 
-    /** Любая смена группы = полная синхронизация (не знаю стоит ли прям так делать, если что уберем) */
+    /** Любая смена группы = полная синхронизация */
     suspend fun setGroupId(groupId: Int) {
         localDb.setSetting(GROUP_ID_DB_KEY, groupId.toString())
         forceSync()
     }
 
+    /** Полная актуализация локальной БД в соответствии с удаленной */
     private suspend fun performFullSync() {
+        try {
+            performInitSync()
+
+            val remoteCalendarEvents = remoteDb.getAllCalendarEvents()
+            localDb.deleteAllCalendarEvents()
+            remoteCalendarEvents.forEach { localDb.insertCalendarEvent(it) }
+
+            val groupId = getGroupId()
+            val remoteSchedule = remoteDb.getScheduleByGroup(groupId?.toInt() ?: 0)
+            localDb.deleteUserSchedule()
+            remoteSchedule.forEach { localDb.insertUserSchedule(it) }
+        } catch (e: Exception) {
+            println("Ошибка в SyncManager.performFullSync(): ${e.message}")
+            throw e
+        }
+    }
+
+    /** Загрузка институтов и групп */
+    private suspend fun performInitSync() {
         try {
             val remoteFaculties = remoteDb.getAllFaculties()
             localDb.deleteAllFaculties()
@@ -52,17 +72,8 @@ class SyncManager(
                     localDb.insertGroup(group)
                 }
             }
-
-            val remoteCalendarEvents = remoteDb.getAllCalendarEvents()
-            localDb.deleteAllCalendarEvents()
-            remoteCalendarEvents.forEach { localDb.insertCalendarEvent(it) }
-
-            val groupId = getGroupId()
-            val remoteSchedule = remoteDb.getScheduleByGroup(groupId?.toInt() ?: 0)
-            localDb.deleteUserSchedule()
-            remoteSchedule.forEach { localDb.insertUserSchedule(it) }
         } catch (e: Exception) {
-            println("Ошибка в SyncManager.performFullSync(): ${e.message}")
+            println("Ошибка в SyncManager.performInitSync(): ${e.message}")
             throw e
         }
     }
@@ -79,7 +90,11 @@ class SyncManager(
         val lastSync = getLastSyncTime()
         val now = Clock.System.now().toEpochMilliseconds()
 
-        return if (lastSync == null || (now - lastSync) > SYNC_INTERVAL.inWholeMilliseconds) {
+        return if (getGroupId() == null) {
+            performInitSync()
+            true
+        }
+        else if (lastSync == null || (now - lastSync) > SYNC_INTERVAL.inWholeMilliseconds) {
             performFullSync()
             setLastSyncTime(now)
             true
