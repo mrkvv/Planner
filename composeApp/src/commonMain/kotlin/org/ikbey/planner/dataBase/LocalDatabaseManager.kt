@@ -255,7 +255,6 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
             query.selectAllUserNotes().executeAsList().map { note ->
                 Note(
                     id = note.id.toInt(),
-                    user_id = note.user_id.toInt(),
                     lesson_id = note.lesson_id?.toInt(),
                     date = note.date,
                     header = note.header_, //хз почему нижнее подчеркивание, так сгенерировалось почемуто
@@ -272,7 +271,6 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
             query.selectUserNotesByLesson(lessonId.toLong()).executeAsList().map { note ->
                 Note(
                     id = note.id.toInt(),
-                    user_id = note.user_id.toInt(),
                     lesson_id = note.lesson_id?.toInt(),
                     date = note.date,
                     header = note.header_,
@@ -289,7 +287,6 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
             query.selectUserNotesByDate(date).executeAsList().map { note ->
                 Note(
                     id = note.id.toInt(),
-                    user_id = note.user_id.toInt(),
                     lesson_id = note.lesson_id?.toInt(),
                     date = note.date,
                     header = note.header_,
@@ -305,7 +302,6 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
         withContext(Dispatchers.IO) {
             query.insertUserNote(
                 id = note.id.toLong(),
-                user_id = note.user_id.toLong(),
                 lesson_id = note.lesson_id?.toLong(),
                 date = note.date,
                 header_ = note.header,
