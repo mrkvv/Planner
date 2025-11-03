@@ -40,6 +40,7 @@ data class Note(
     val date: String? = null,
     val header: String? = null,
     val note: String? = null,
+    val is_notifications_enabled: Boolean? = null,
     val created_at: String? = null,
     val updated_at: String? = null
 )

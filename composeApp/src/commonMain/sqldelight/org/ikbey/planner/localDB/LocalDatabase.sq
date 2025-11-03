@@ -41,6 +41,7 @@ CREATE TABLE user_notes (
     date TEXT,
     header TEXT,
     note TEXT,
+    is_notifications_enabled INTEGER,
     created_at TEXT,
     updated_at TEXT
 );
@@ -147,8 +148,8 @@ SELECT user_notes.* FROM user_notes WHERE date = ?;
 
 insertUserNote:
 INSERT OR REPLACE INTO user_notes
-(id, lesson_id, date, header, note, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+(id, lesson_id, date, header, note, is_notifications_enabled, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 deleteUserNote:
 DELETE FROM user_notes WHERE id = ?;
