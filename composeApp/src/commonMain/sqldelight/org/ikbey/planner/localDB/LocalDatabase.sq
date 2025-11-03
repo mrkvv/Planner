@@ -42,8 +42,8 @@ CREATE TABLE user_notes (
     header TEXT,
     note TEXT,
     is_notifications_enabled INTEGER,
-    created_at TEXT,
-    updated_at TEXT
+    start_time TEXT,
+    end_time TEXT
 );
 
 CREATE TABLE user_sticky_notes (
@@ -148,7 +148,7 @@ SELECT user_notes.* FROM user_notes WHERE date = ?;
 
 insertUserNote:
 INSERT OR REPLACE INTO user_notes
-(id, lesson_id, date, header, note, is_notifications_enabled, created_at, updated_at)
+(id, lesson_id, date, header, note, is_notifications_enabled, start_time, end_time)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 deleteUserNote:

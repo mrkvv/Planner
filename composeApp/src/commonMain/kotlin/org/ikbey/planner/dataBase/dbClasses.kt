@@ -41,8 +41,8 @@ data class Note(
     val header: String? = null,
     val note: String? = null,
     val is_notifications_enabled: Boolean? = null,
-    val created_at: String? = null,
-    val updated_at: String? = null
+    val start_time: String? = null,
+    val end_time: String? = null
 )
 
 @Serializable
