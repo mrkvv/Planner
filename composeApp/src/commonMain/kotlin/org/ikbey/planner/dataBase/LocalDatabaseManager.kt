@@ -260,8 +260,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     header = note.header_,
                     note = note.note,
                     is_notifications_enabled = note.is_notifications_enabled?.toInt() != 0,
-                    created_at = note.created_at,
-                    updated_at = note.updated_at
+                    start_time = note.start_time,
+                    end_time = note.end_time
                 )
             }
         }
@@ -277,8 +277,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     header = note.header_,
                     note = note.note,
                     is_notifications_enabled = note.is_notifications_enabled?.toInt() != 0,
-                    created_at = note.created_at,
-                    updated_at = note.updated_at
+                    start_time = note.start_time,
+                    end_time = note.end_time
                 )
             }
         }
@@ -294,8 +294,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     header = note.header_,
                     note = note.note,
                     is_notifications_enabled = note.is_notifications_enabled?.toInt() != 0,
-                    created_at = note.created_at,
-                    updated_at = note.updated_at
+                    start_time = note.start_time,
+                    end_time = note.end_time
                 )
             }
         }
@@ -310,8 +310,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                 header_ = note.header,
                 note = note.note,
                 is_notifications_enabled = if (note.is_notifications_enabled == true) 1L else 0L,
-                created_at = note.created_at,
-                updated_at = note.updated_at
+                start_time = note.start_time,
+                end_time = note.end_time
             )
         }
     }
