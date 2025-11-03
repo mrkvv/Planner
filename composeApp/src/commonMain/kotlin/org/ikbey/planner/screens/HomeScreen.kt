@@ -16,10 +16,12 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -54,6 +56,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
 import kotlinx.coroutines.delay
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
 
 
 @Composable
@@ -68,8 +71,8 @@ fun HomeScreen(
     var selectedYear by remember { mutableStateOf(currentDate.year) }
     var selectedMonth by remember { mutableStateOf(currentDate.month) }
     var selectedDay by remember { mutableStateOf(currentDate.day) }
-    var showBottomSheet by remember { mutableStateOf(false) }
-    //var showBottomSheet = true
+    //var showBottomSheet by remember { mutableStateOf(false) }
+    var showBottomSheet = true
 
     val bottomSheetOffset by animateDpAsState(
         targetValue = if (showBottomSheet) 0.dp else 500.dp,
@@ -89,7 +92,7 @@ fun HomeScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 24.dp, end = 20.dp, top = 45.dp),
+                    .padding(start = 20.dp, end = 20.dp, top = 45.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom
             ) {
@@ -126,7 +129,7 @@ fun HomeScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -456,7 +459,7 @@ fun BottomSheetMenu(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -496,15 +499,17 @@ fun BottomSheetMenu(
                     onDismiss()
                 },
                 modifier = Modifier
-                    .padding(vertical = 8.dp),
+                    .heightIn(min = 45.dp)
+                    .widthIn(min = 120.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = LightOrange),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 Text(
                     "Добавить",
                     fontFamily = getInterFont(InterFontType.BOLD),
                     fontSize = 20.sp,
-                    color = DarkOrange
+                    color = DarkOrange,
+                    maxLines = 1
                 )
             }
         }
@@ -535,6 +540,7 @@ fun SimpleLocationField(
                 fontFamily = getInterFont(InterFontType.REGULAR),
                 fontSize = 20.sp,
                 color = Color.Black
+
             ),
             singleLine = true,
             decorationBox = { innerTextField ->
@@ -543,7 +549,9 @@ fun SimpleLocationField(
                         "Место проведения",
                         color = LightGray,
                         fontFamily = getInterFont(InterFontType.REGULAR),
-                        fontSize = 20.sp
+                        fontSize = 20.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
                 innerTextField()
@@ -564,13 +572,12 @@ fun UnifiedTimeInputField(
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-
         if (isInterval) {
             Row(
                 modifier = Modifier
-                    .width(170.dp)
+                    .widthIn(min = 200.dp, max = 250.dp)
                     .height(35.dp)
                     .background(
                         color = Color.White,
@@ -583,15 +590,17 @@ fun UnifiedTimeInputField(
                 IntervalTimePart(
                     value = startTime,
                     onValueChange = onStartTimeChange,
-                    placeholder = "__:__"
+                    placeholder = "__:__",
+                    modifier = Modifier.width(70.dp)
                 )
 
-                Text("-", color = LightGray, fontFamily = getInterFont(InterFontType.SEMI_BOLD), fontSize = 20.sp)
+                Text("-", color = LightGray, fontFamily = getInterFont(InterFontType.SEMI_BOLD), fontSize = 16.sp)
 
                 IntervalTimePart(
                     value = endTime,
                     onValueChange = onEndTimeChange,
-                    placeholder = "__:__"
+                    placeholder = "__:__",
+                    modifier = Modifier.width(70.dp)
                 )
             }
         } else {
@@ -599,7 +608,7 @@ fun UnifiedTimeInputField(
                 value = startTime,
                 onValueChange = onStartTimeChange,
                 modifier = Modifier
-                    .width(105.dp)
+                    .width(100.dp)
                     .height(35.dp)
             )
         }
@@ -665,7 +674,8 @@ fun SingleTimeField(
 fun IntervalTimePart(
     value: String,
     onValueChange: (String) -> Unit,
-    placeholder: String
+    placeholder: String,
+    modifier: Modifier = Modifier
 ) {
     var textFieldValue by remember(value) {
         mutableStateOf(
@@ -677,8 +687,7 @@ fun IntervalTimePart(
     }
 
     Box(
-        modifier = Modifier
-            .width(65.dp)
+        modifier = modifier
             .fillMaxHeight()
             .background(Color.Transparent)
             .padding(horizontal = 4.dp),
