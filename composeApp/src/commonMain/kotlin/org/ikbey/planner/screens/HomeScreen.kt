@@ -71,8 +71,8 @@ fun HomeScreen(
     var selectedYear by remember { mutableStateOf(currentDate.year) }
     var selectedMonth by remember { mutableStateOf(currentDate.month) }
     var selectedDay by remember { mutableStateOf(currentDate.day) }
-    //var showBottomSheet by remember { mutableStateOf(false) }
-    var showBottomSheet = true
+    var showBottomSheet by remember { mutableStateOf(false) }
+    //var showBottomSheet = true
 
     val bottomSheetOffset by animateDpAsState(
         targetValue = if (showBottomSheet) 0.dp else 500.dp,
@@ -728,14 +728,39 @@ fun IntervalTimePart(
 
 fun delayedTimeFormat(input: String): String {
     val digitsOnly = input.filter { it.isDigit() }
+    val result = StringBuilder()
 
-    return when (digitsOnly.length) {
-        0 -> ""
-        1 -> digitsOnly
-        2 -> digitsOnly
-        3 -> digitsOnly
-        4 -> "${digitsOnly.take(2)}:${digitsOnly.takeLast(2)}"
-        else -> input.take(5)
+    for (i in digitsOnly.indices) {
+        when (i) {
+            0 -> {
+                val digit = digitsOnly[i].toString().toInt()
+                if (digit in 0..2) result.append(digit)
+            }
+            1 -> {
+                val firstDigit = digitsOnly[0].toString().toInt()
+                val secondDigit = digitsOnly[i].toString().toInt()
+                if (firstDigit == 2) {
+                    if (secondDigit in 0..3) result.append(secondDigit)
+                } else {
+                    if (secondDigit in 0..9) result.append(secondDigit)
+                }
+            }
+            2 -> {
+                val digit = digitsOnly[i].toString().toInt()
+                if (digit in 0..5) result.append(digit)
+            }
+            3 -> {
+                val digit = digitsOnly[i].toString().toInt()
+                if (digit in 0..9) result.append(digit)
+            }
+        }
+    }
+
+    val formatted = result.toString()
+
+    return when (formatted.length) {
+        4 -> "${formatted.take(2)}:${formatted.takeLast(2)}"
+        else -> formatted
     }
 }
 
@@ -746,7 +771,19 @@ fun SimpleInputField(
     placeholder: String,
     modifier: Modifier = Modifier
 ) {
-    var isFocused by remember { mutableStateOf(false) }
+    var textFieldValue by remember(value) {
+        mutableStateOf(TextFieldValue(
+            text = value,
+            selection = TextRange(value.length)
+        ))
+    }
+
+    val (header, body) = remember(value) {
+        val lines = value.split('\n')
+        val headerText = lines.firstOrNull() ?: ""
+        val bodyText = if (lines.size > 1) lines.subList(1, lines.size).joinToString("\n") else ""
+        Pair(headerText, bodyText)
+    }
 
     Box(
         modifier = modifier
@@ -757,71 +794,67 @@ fun SimpleInputField(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.TopStart
     ) {
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier
-                .fillMaxSize()
-                .onFocusChanged { isFocused = it.isFocused },
-            textStyle = androidx.compose.ui.text.TextStyle(
-                fontFamily = getInterFont(InterFontType.REGULAR),
-                fontSize = 20.sp,
-                color = Color.Black
-            ),
-            decorationBox = { innerTextField ->
-                Box {
-                    if (value.isEmpty() && !isFocused) {
-                        Column {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            BasicTextField(
+                value = header,
+                onValueChange = { newHeader ->
+                    val newText = if (body.isNotEmpty()) "$newHeader\n$body" else newHeader
+                    onValueChange(newText)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontFamily = getInterFont(InterFontType.MEDIUM),
+                    fontSize = 24.sp,
+                    color = Color.Black
+                ),
+                decorationBox = { innerTextField ->
+                    Box {
+                        innerTextField()
+                        if (header.isEmpty() && value.isEmpty()) {
                             Text(
                                 placeholder,
-                                modifier = Modifier.padding(top = 5.dp, start = 5.dp),
                                 color = LightGray,
                                 fontFamily = getInterFont(InterFontType.MEDIUM),
                                 fontSize = 24.sp
                             )
+                        }
+                    }
+                }
+            )
+
+            BasicTextField(
+                value = body,
+                onValueChange = { newBody ->
+                    val newText = if (header.isNotEmpty()) "$header\n$newBody" else newBody
+                    onValueChange(newText)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontFamily = getInterFont(InterFontType.REGULAR),
+                    fontSize = 20.sp,
+                    color = Color.Black
+                ),
+                decorationBox = { innerTextField ->
+                    Box {
+                        innerTextField()
+                        if (body.isEmpty() && value.isEmpty()) {
                             Text(
                                 "Введите текст...",
-                                modifier = Modifier.padding(top = 4.dp, start = 5.dp),
                                 color = LightGray,
                                 fontFamily = getInterFont(InterFontType.REGULAR),
                                 fontSize = 20.sp
                             )
                         }
-                    } else {
-                        Column {
-                            if (value.isNotEmpty()) {
-                                val firstLine = value.split('\n').firstOrNull() ?: ""
-                                if (firstLine.isNotEmpty()) {
-                                    Text(
-                                        firstLine,
-                                        color = Color.Black,
-                                        fontFamily = getInterFont(InterFontType.MEDIUM),
-                                        fontSize = 24.sp,
-                                        fontWeight = FontWeight.Normal
-                                    )
-                                }
-                                val remainingText = value.substring(firstLine.length).trimStart('\n')
-                                if (remainingText.isNotEmpty()) {
-                                    Text(
-                                        remainingText,
-                                        color = Color.Black,
-                                        fontFamily = getInterFont(InterFontType.REGULAR),
-                                        fontSize = 20.sp,
-                                        modifier = Modifier.padding(top = 4.dp)
-                                    )
-                                }
-                            }
-                            Box(modifier = Modifier.alpha(0f)) {
-                                innerTextField()
-                            }
-                        }
-                    }
-                    if (value.isEmpty() && isFocused) {
-                        innerTextField()
                     }
                 }
-            }
-        )
+            )
+        }
     }
 }
 
