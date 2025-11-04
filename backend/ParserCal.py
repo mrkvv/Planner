@@ -19,7 +19,7 @@ class CalendarEvent:
 
 class GoogleCalendarParser:
     BASE_URL = "https://www.googleapis.com/calendar/v3/calendars/"
-    API_KEY = "AIzaSyD_7is5XFIRElxdi4PjUPhtYTb2C85CeL8"
+    API_KEY = "*"
 
     CALENDARS = [
         {"id": "event@profunion.pro", "name": "ПРОФ.event"},
@@ -139,4 +139,5 @@ class GoogleCalendarParser:
             time.sleep(0.1)
 
         all_events.sort(key=lambda x: (x.date, x.start_time))
+
         return all_events
