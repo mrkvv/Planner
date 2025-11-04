@@ -23,7 +23,9 @@ fun NavGraph() {
             selectedYear = selectedYear,
             selectedMonth = selectedMonth,
             selectedDay = selectedDay,
-            onDayChange = { day -> selectedDay = day }
+            onDayChange = { day -> selectedDay = day },
+            onSwipeToMonth = { currentScreen = Screen.Month},
+            onSwipeToEvents = { currentScreen = Screen.Events}
         )
         Screen.Month -> MonthScreen(
             onCalendarDaySelect = { year, month, day ->
@@ -31,10 +33,12 @@ fun NavGraph() {
                 selectedMonth = month
                 selectedDay = day
                 currentScreen = Screen.Home
-            }
+            },
+            onSwipeToHome = { currentScreen = Screen.Home}
         )
         Screen.Events -> EventsScreen(
-            onBackClick = { currentScreen = Screen.Home }
+            onBackClick = { currentScreen = Screen.Home },
+            onSwipeToHome = { currentScreen = Screen.Home}
         )
     }
 }
