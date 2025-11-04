@@ -99,7 +99,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     location = event.location,
                     creator = event.creator,
                     calendar_name = event.calendar_name,
-                    is_tracked = event.is_tracked.toInt() == 1
+                    is_tracked = event.is_tracked.toInt() == 1,
+                    is_done = event.is_done.toInt() == 1
                 )
             }
         }
@@ -118,7 +119,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     location = event.location,
                     creator = event.creator,
                     calendar_name = event.calendar_name,
-                    is_tracked = event.is_tracked.toInt() == 1
+                    is_tracked = event.is_tracked.toInt() == 1,
+                    is_done = event.is_done.toInt() == 1
                 )
             }
         }
@@ -137,7 +139,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     location = event.location,
                     creator = event.creator,
                     calendar_name = event.calendar_name,
-                    is_tracked = event.is_tracked.toInt() == 1
+                    is_tracked = event.is_tracked.toInt() == 1,
+                    is_done = event.is_done.toInt() == 1
                 )
             }
         }
@@ -156,7 +159,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     location = event.location,
                     creator = event.creator,
                     calendar_name = event.calendar_name,
-                    is_tracked = event.is_tracked.toInt() == 1
+                    is_tracked = event.is_tracked.toInt() == 1,
+                    is_done = event.is_done.toInt() == 1
                 )
             }
         }
@@ -175,7 +179,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     location = event.location,
                     creator = event.creator,
                     calendar_name = event.calendar_name,
-                    is_tracked = event.is_tracked.toInt() == 1
+                    is_tracked = event.is_tracked.toInt() == 1,
+                    is_done = event.is_done.toInt() == 1
                 )
             }
         }
@@ -185,6 +190,15 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
         withContext(Dispatchers.IO) {
             query.updateCalendarEventTracking(
                 is_tracked = if (isTracked) 1 else 0,
+                id = eventId.toLong()
+            )
+        }
+    }
+
+    suspend fun updateCalendarEventIsDone(eventId: Int, isDone: Boolean) {
+        withContext(Dispatchers.IO) {
+            query.updateCalendarEventIsDone(
+                is_done = if (isDone) 1 else 0,
                 id = eventId.toLong()
             )
         }
@@ -202,7 +216,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                 location = event.location,
                 creator = event.creator,
                 calendar_name = event.calendar_name,
-                is_tracked = if (event.is_tracked) 1 else 0
+                is_tracked = if (event.is_tracked) 1 else 0,
+                is_done = if (event.is_done) 1 else 0
             )
         }
     }
@@ -233,7 +248,9 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     start_time = schedule.start_time,
                     end_time = schedule.end_time,
                     teacher = schedule.teacher,
-                    audithory = schedule.audithory
+                    audithory = schedule.audithory,
+                    is_done = schedule.is_done.toInt() == 1
+
                 )
             }
         }
@@ -252,7 +269,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     start_time = schedule.start_time,
                     end_time = schedule.end_time,
                     teacher = schedule.teacher,
-                    audithory = schedule.audithory
+                    audithory = schedule.audithory,
+                    is_done = schedule.is_done.toInt() == 1
                 )
             }
         }
@@ -271,9 +289,19 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     start_time = schedule.start_time,
                     end_time = schedule.end_time,
                     teacher = schedule.teacher,
-                    audithory = schedule.audithory
+                    audithory = schedule.audithory,
+                    is_done = schedule.is_done.toInt() == 1
                 )
             }
+        }
+    }
+
+    suspend fun updateUserScheduleIsDone(scheduleId: Int, isDone: Boolean) {
+        withContext(Dispatchers.IO) {
+            query.updateUserScheduleIsDone(
+                is_done = if (isDone) 1 else 0,
+                id = scheduleId.toLong()
+            )
         }
     }
 
@@ -289,7 +317,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                 start_time = schedule.start_time,
                 end_time = schedule.end_time,
                 teacher = schedule.teacher,
-                audithory = schedule.audithory
+                audithory = schedule.audithory,
+                is_done = if (schedule.is_done) 1 else 0
             )
         }
     }
@@ -312,7 +341,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     note = note.note,
                     is_notifications_enabled = note.is_notifications_enabled?.toInt() != 0,
                     start_time = note.start_time,
-                    end_time = note.end_time
+                    end_time = note.end_time,
+                    is_done = note.is_done.toInt() == 1
                 )
             }
         }
@@ -329,7 +359,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     note = note.note,
                     is_notifications_enabled = note.is_notifications_enabled?.toInt() != 0,
                     start_time = note.start_time,
-                    end_time = note.end_time
+                    end_time = note.end_time,
+                    is_done = note.is_done.toInt() == 1
                 )
             }
         }
@@ -346,9 +377,19 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     note = note.note,
                     is_notifications_enabled = note.is_notifications_enabled?.toInt() != 0,
                     start_time = note.start_time,
-                    end_time = note.end_time
+                    end_time = note.end_time,
+                    is_done = note.is_done.toInt() == 1
                 )
             }
+        }
+    }
+
+    suspend fun updateUserNoteIsDone(userNoteId: Int, isDone: Boolean) {
+        withContext(Dispatchers.IO) {
+            query.updateUserNoteIsDone(
+                is_done = if (isDone) 1 else 0,
+                id = userNoteId.toLong()
+            )
         }
     }
 
@@ -362,7 +403,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                 note = note.note,
                 is_notifications_enabled = if (note.is_notifications_enabled == true) 1 else 0,
                 start_time = note.start_time,
-                end_time = note.end_time
+                end_time = note.end_time,
+                is_done = if (note.is_done) 1 else 0
             )
         }
     }
