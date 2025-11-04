@@ -46,7 +46,9 @@ import org.ikbey.planner.dataBase.StickyNote
 import org.ikbey.planner.getInterFont
 
 @Composable
-fun MonthScreen(onBackClick: () -> Unit) {
+fun MonthScreen(
+    onCalendarDaySelect: (year: Int, month: Int, day: Int) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -106,7 +108,8 @@ fun MonthScreen(onBackClick: () -> Unit) {
                     month = 12
                 }
                 else month--
-            }
+            },
+            onCalendarDaySelect = onCalendarDaySelect
         )
 
         StickyNotesArea(
@@ -162,7 +165,8 @@ fun CalendarWindow(
     year: Int,
     month: Int,
     onMonthChangeUp: () -> Unit,
-    onMonthChangeDown: () -> Unit
+    onMonthChangeDown: () -> Unit,
+    onCalendarDaySelect: (year: Int, month: Int, day: Int) -> Unit
 ) {
     var calendarMatrix by remember (year, month) {
         mutableStateOf(calendarManager.getCalendarMatrix(year, month))
@@ -206,7 +210,8 @@ fun CalendarWindow(
                             calendarManager = calendarManager,
                             year = year,
                             month = month,
-                            num = day
+                            num = day,
+                            onCalendarDaySelect = onCalendarDaySelect
                         )
                     }
                 }
@@ -240,7 +245,8 @@ fun CalendarElement(
     calendarManager: CalendarManager,
     year: Int,
     month: Int,
-    num: Int?
+    num: Int?,
+    onCalendarDaySelect: (year: Int, month: Int, day: Int) -> Unit
 ) {
     val isToday = calendarManager.isToday(year, month, num)
     Box(
@@ -253,9 +259,7 @@ fun CalendarElement(
             )
             .clickable(
                 enabled = num != null,
-                onClick = {
-
-                }
+                onClick = { onCalendarDaySelect(year, month, num!!) }
             ),
         contentAlignment = Alignment.Center,
     ) {
@@ -268,7 +272,6 @@ fun CalendarElement(
             color = if (isToday) DarkOrange else DarkGreen
         )
     }
-
 }
 
 @Composable

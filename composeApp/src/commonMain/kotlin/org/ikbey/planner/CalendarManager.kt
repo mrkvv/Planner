@@ -17,6 +17,11 @@ class CalendarManager {
         return date.year
     }
 
+    fun getCurrentDay(): Int {
+        val date = PlatformDate()
+        return date.day
+    }
+
     fun getMonthName(month: Int): String {
         return when (month) {
             1 -> "Январь"

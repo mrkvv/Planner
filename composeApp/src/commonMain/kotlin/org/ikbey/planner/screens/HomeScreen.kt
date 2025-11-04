@@ -73,18 +73,16 @@ import org.ikbey.planner.dataBase.*
 
 @Composable
 fun HomeScreen(
-    onMonthClick: () -> Unit,
-    onEventsClick: () -> Unit,
-    onAddNoteClick: (NoteData) -> Unit
+    selectedYear: Int,
+    selectedMonth: Int,
+    selectedDay: Int,
+    onDayChange: (day: Int) -> Unit
 ) {
     val calendarManager = remember { CalendarManager() }
     val currentDate = PlatformDate()
     val localDb = ServiceLocator.localDatabaseManager
     val coroutineScope = rememberCoroutineScope()
 
-    var selectedYear by remember { mutableStateOf(currentDate.year) }
-    var selectedMonth by remember { mutableStateOf(currentDate.month) }
-    var selectedDay by remember { mutableStateOf(currentDate.day) }
     var showAddNoteSheet by remember { mutableStateOf(false) }
     var showNoteDetail by remember { mutableStateOf(false) }
     var selectedNote by remember { mutableStateOf<Note?>(null) }
@@ -170,7 +168,7 @@ fun HomeScreen(
                 month = selectedMonth,
                 selectedDay = selectedDay,
                 onDayClick = { day ->
-                    selectedDay = day
+                    onDayChange(day)
                     isListChanged = !isListChanged
                 },
                 modifier = Modifier.padding(horizontal = 16.dp)
@@ -269,8 +267,6 @@ fun HomeScreen(
             ) {
                 BottomSheetMenu(
                     onDismiss = { showAddNoteSheet = false },
-                    onMonthClick = onMonthClick,
-                    onEventsClick = onEventsClick,
                     onAddNoteClick = { noteData ->
                         coroutineScope.launch {
                             try {
@@ -1012,8 +1008,6 @@ fun AddButton(
 @Composable
 fun BottomSheetMenu(
     onDismiss: () -> Unit,
-    onMonthClick: () -> Unit,
-    onEventsClick: () -> Unit,
     onAddNoteClick: (NoteData) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1610,14 +1604,4 @@ fun isValidTime(time: String): Boolean {
     val minutes = time.substring(3, 5).toIntOrNull() ?: return false
 
     return hours in 0..23 && minutes in 0..59
-}
-
-@Preview(showBackground = true)
-@Composable
-fun HomeScreenPreview() {
-    HomeScreen(
-        onMonthClick = {},
-        onEventsClick = {},
-        onAddNoteClick = {}
-    )
 }
