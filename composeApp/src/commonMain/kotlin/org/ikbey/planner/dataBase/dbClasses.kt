@@ -55,7 +55,8 @@ data class CalendarEvent(
     val end_time: String,
     val location: String? = null,
     val creator: String,
-    val calendar_name: String
+    val calendar_name: String,
+    val is_tracked: Boolean = false
 )
 
 @Serializable

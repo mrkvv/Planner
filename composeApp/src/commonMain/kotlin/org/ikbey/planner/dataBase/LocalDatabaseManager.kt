@@ -98,7 +98,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     end_time = event.end_time,
                     location = event.location,
                     creator = event.creator,
-                    calendar_name = event.calendar_name
+                    calendar_name = event.calendar_name,
+                    is_tracked = event.is_tracked.toInt() == 1
                 )
             }
         }
@@ -116,7 +117,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     end_time = event.end_time,
                     location = event.location,
                     creator = event.creator,
-                    calendar_name = event.calendar_name
+                    calendar_name = event.calendar_name,
+                    is_tracked = event.is_tracked.toInt() == 1
                 )
             }
         }
@@ -134,9 +136,57 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     end_time = event.end_time,
                     location = event.location,
                     creator = event.creator,
-                    calendar_name = event.calendar_name
+                    calendar_name = event.calendar_name,
+                    is_tracked = event.is_tracked.toInt() == 1
                 )
             }
+        }
+    }
+
+    suspend fun getTrackedCalendarEvents(): List<CalendarEvent> {
+        return withContext(Dispatchers.IO) {
+            query.selectTrackedCalendarEvents().executeAsList().map { event ->
+                CalendarEvent(
+                    id = event.id.toInt(),
+                    title = event.title,
+                    description = event.description,
+                    date = event.date,
+                    start_time = event.start_time,
+                    end_time = event.end_time,
+                    location = event.location,
+                    creator = event.creator,
+                    calendar_name = event.calendar_name,
+                    is_tracked = event.is_tracked.toInt() == 1
+                )
+            }
+        }
+    }
+
+    suspend fun getTrackedCalendarEventsByDate(date: String): List<CalendarEvent> {
+        return withContext(Dispatchers.IO) {
+            query.selectTrackedCalendarEventsByDate(date).executeAsList().map { event ->
+                CalendarEvent(
+                    id = event.id.toInt(),
+                    title = event.title,
+                    description = event.description,
+                    date = event.date,
+                    start_time = event.start_time,
+                    end_time = event.end_time,
+                    location = event.location,
+                    creator = event.creator,
+                    calendar_name = event.calendar_name,
+                    is_tracked = event.is_tracked.toInt() == 1
+                )
+            }
+        }
+    }
+
+    suspend fun updateCalendarEventTracking(eventId: Int, isTracked: Boolean) {
+        withContext(Dispatchers.IO) {
+            query.updateCalendarEventTracking(
+                is_tracked = if (isTracked) 1 else 0,
+                id = eventId.toLong()
+            )
         }
     }
 
@@ -151,7 +201,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                 end_time = event.end_time,
                 location = event.location,
                 creator = event.creator,
-                calendar_name = event.calendar_name
+                calendar_name = event.calendar_name,
+                is_tracked = if (event.is_tracked) 1 else 0
             )
         }
     }
@@ -309,7 +360,7 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                 date = note.date,
                 header_ = note.header,
                 note = note.note,
-                is_notifications_enabled = if (note.is_notifications_enabled == true) 1L else 0L,
+                is_notifications_enabled = if (note.is_notifications_enabled == true) 1 else 0,
                 start_time = note.start_time,
                 end_time = note.end_time
             )
@@ -398,6 +449,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
      * Возможные варианты ключей, если ну прям очень хочется юзнуть эту функцию:
      * @param last_sync_time timestamp последней синхронизации пользователя
      * @param group_id id группы пользователя (не name группы, а именно id!)
+     * @param init_load 1 или 0. Если 1, то институты и группы уже были загружены. Если 0, то нет и нужно загрузить.
+     * 0 встретится только один раз при первом запуске приложения.
      *
      * В случае, если использовать другое значение для ключа,
      * то вероятно вернется null (если кто-то до вас не установил значение такому ключу, что маловероятно) */
@@ -422,6 +475,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
      * Возможные варианты ключей, если ну прям очень хочется юзнуть эту функцию:
      * @param last_sync_time timestamp последней синхронизации пользователя
      * @param group_id id группы пользователя (не name группы, а именно id!)
+     * @param init_load 1 или null. Если 1, то институты и группы уже были загружены. Если null, то нет и нужно загрузить.
+     * null встретится только один раз при первом запуске приложения.
      *
      * В случае, если использовать другое значение для ключа,
      * то создатся новая запись в локальной БД с указанным ключем и значением. */
