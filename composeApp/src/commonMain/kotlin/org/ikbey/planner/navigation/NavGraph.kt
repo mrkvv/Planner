@@ -20,7 +20,8 @@ fun NavGraph() {
         Screen.Home -> HomeScreen(
             onMonthClick = { currentScreen = Screen.Month },
             onEventsClick = { currentScreen = Screen.Events },
-            onAddNoteClick = { currentScreen = Screen.AddNote }
+            onAddNoteClick = { noteData ->
+            }
         )
         Screen.Month -> MonthScreen(
             onBackClick = { currentScreen = Screen.Home }
