@@ -16,6 +16,7 @@ class SyncManager(
         private val SYNC_INTERVAL = 24.toDuration(DurationUnit.HOURS)
         private val LAST_SYNC_TIME_DB_KEY = "last_sync_time"
         private val GROUP_ID_DB_KEY = "group_id"
+        private val INIT_LOAD = "init_load"
     }
     suspend fun getLastSyncTime(): Long? {
         return localDb.getSetting(LAST_SYNC_TIME_DB_KEY)?.toLongOrNull()
@@ -42,8 +43,6 @@ class SyncManager(
     /** Полная актуализация локальной БД в соответствии с удаленной */
     private suspend fun performFullSync() {
         try {
-            performInitSync()
-
             val remoteCalendarEvents = remoteDb.getAllCalendarEvents()
             localDb.deleteAllCalendarEvents()
             remoteCalendarEvents.forEach { localDb.insertCalendarEvent(it) }
@@ -72,12 +71,12 @@ class SyncManager(
                     localDb.insertGroup(group)
                 }
             }
+            localDb.setSetting(INIT_LOAD, "1")
         } catch (e: Exception) {
             println("Ошибка в SyncManager.performInitSync(): ${e.message}")
             throw e
         }
     }
-
 
     @OptIn(ExperimentalTime::class)
     suspend fun forceSync() {
@@ -90,11 +89,11 @@ class SyncManager(
         val lastSync = getLastSyncTime()
         val now = Clock.System.now().toEpochMilliseconds()
 
-        return if (getGroupId() == null) {
+        return if (getGroupId() == null && localDb.getSetting(INIT_LOAD) != "1") {
             performInitSync()
             true
         }
-        else if (lastSync == null || (now - lastSync) > SYNC_INTERVAL.inWholeMilliseconds) {
+        else if (getGroupId() != null && (lastSync == null || (now - lastSync) > SYNC_INTERVAL.inWholeMilliseconds) ) {
             performFullSync()
             setLastSyncTime(now)
             true

@@ -30,19 +30,21 @@ data class Schedule(
     val start_time: String,
     val end_time: String,
     val teacher: String? = null,
-    val audithory: String? = null
+    val audithory: String? = null,
+    val is_done: Boolean = false
 )
 
 @Serializable
 data class Note(
     val id: Int,
-    val lesson_id: Int? = null,
     val date: String? = null,
+    val place: String? = null,
     val header: String? = null,
     val note: String? = null,
     val is_notifications_enabled: Boolean? = null,
     val start_time: String? = null,
-    val end_time: String? = null
+    val end_time: String? = null,
+    val is_done: Boolean = false
 )
 
 @Serializable
@@ -55,7 +57,9 @@ data class CalendarEvent(
     val end_time: String,
     val location: String? = null,
     val creator: String,
-    val calendar_name: String
+    val calendar_name: String,
+    val is_tracked: Boolean = false,
+    val is_done: Boolean = false
 )
 
 @Serializable
