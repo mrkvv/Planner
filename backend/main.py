@@ -15,8 +15,8 @@ class DatabaseManager:
             'host': 'aws-1-eu-north-1.pooler.supabase.com',
             'port': 5432,
             'database': 'postgres',
-            'user': 'postgres.pjcbyabqlgpjvkozojvc',
-            'password': 'yebkiSQDpswd',
+            'user': '*',
+            'password': '*',
         }
         self.connection = None
         self.max_retries = 3
@@ -667,4 +667,5 @@ def main():
 
 if __name__ == "__main__":
     verify_connection()
+
     main()
