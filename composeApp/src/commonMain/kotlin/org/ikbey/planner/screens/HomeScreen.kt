@@ -7,6 +7,7 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,6 +60,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -76,12 +78,19 @@ fun HomeScreen(
     selectedYear: Int,
     selectedMonth: Int,
     selectedDay: Int,
-    onDayChange: (day: Int) -> Unit
+    onDayChange: (day: Int) -> Unit,
+    onSwipeToMonth: () -> Unit,
+    onSwipeToEvents: () -> Unit
 ) {
     val calendarManager = remember { CalendarManager() }
     val currentDate = PlatformDate()
     val localDb = ServiceLocator.localDatabaseManager
     val coroutineScope = rememberCoroutineScope()
+
+    var showSettings by remember {mutableStateOf(false)}
+
+    var isLeftSwipeActive by remember { mutableStateOf(false) }
+    var isRightSwipeActive by remember { mutableStateOf(false) }
 
     var showAddNoteSheet by remember { mutableStateOf(false) }
     var showNoteDetail by remember { mutableStateOf(false) }
@@ -131,7 +140,49 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Yellow)
+            .pointerInput(Unit) {
+            detectHorizontalDragGestures(
+                onDragStart = { change ->
+                    val start = change.x
+                    val screenWidth = size.width
+                    isLeftSwipeActive = start < screenWidth * 0.40f
+                    isRightSwipeActive = start > screenWidth * 0.60f
+                },
+                onHorizontalDrag = {change, dragAmount ->
+                    if (isLeftSwipeActive && dragAmount > 50f){
+                        onSwipeToMonth()
+                    }
+                    if (isRightSwipeActive && dragAmount < -50f){
+                        onSwipeToEvents()
+                    }
+                },
+
+                onDragEnd = {
+                    isLeftSwipeActive = false
+                    isRightSwipeActive = false
+                }
+            )
+        }
     ) {
+        if (isLeftSwipeActive) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(4.dp)
+                    .background(Color.Gray)
+            )
+        }
+
+        if (isRightSwipeActive) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(4.dp)
+                    .background(Color.Gray)
+                    .align(Alignment.CenterEnd)
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize(),
@@ -158,7 +209,18 @@ fun HomeScreen(
                             color = LightOrange,
                             shape = CircleShape
                         )
-                )
+                ){
+                    SettingsButton(
+                        isSettingsOpen = showSettings,
+                        onClick = {showSettings = true}
+                    )
+
+                    if (showSettings) {
+                        SettingsCard(
+                            onDismiss = { showSettings = false }
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
