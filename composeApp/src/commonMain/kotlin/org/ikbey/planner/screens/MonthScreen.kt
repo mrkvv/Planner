@@ -2,17 +2,20 @@ package org.ikbey.planner.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -33,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.modifier.modifierLocalOf
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,74 +52,117 @@ import org.ikbey.planner.getInterFont
 
 @Composable
 fun MonthScreen(
-    onCalendarDaySelect: (year: Int, month: Int, day: Int) -> Unit
+    onCalendarDaySelect: (year: Int, month: Int, day: Int) -> Unit,
+    onSwipeToHome: () -> Unit
 ) {
-    Column(
+    var isSwipeActive by remember { mutableStateOf(false) }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(color = Yellow)
-            .padding(top = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        var showSettings by remember {mutableStateOf(false)}
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = { change ->
+                        val start = change.x
+                        val screenWidth = size.width
 
-        val calendarManager = remember { CalendarManager() }
-        var year by remember { mutableStateOf(calendarManager.getCurrentYear()) }
-        var month by remember { mutableStateOf(calendarManager.getCurrentMonth()) }
+                        isSwipeActive = start > screenWidth * 0.60f
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        if (isSwipeActive && dragAmount < -50f) {
+                            onSwipeToHome()
+                        }
+                    },
+                    onDragEnd = {
+                        isSwipeActive = false
+                    }
+                )
+            }
+    ){
+        if (isSwipeActive) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(4.dp)
+                    .background(Color.Gray)
+                    .align(Alignment.CenterEnd)
+            )
+        }
 
-        Box(
-            modifier = Modifier.fillMaxWidth()
-                .systemBarsPadding(),
-            contentAlignment = Alignment.TopCenter
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            //Центрированная плашка с месяцем
-            CalendarHeader(
-                modifier = Modifier.padding(top = 30.dp),
+            var showSettings by remember {mutableStateOf(false)}
+
+            val calendarManager = remember { CalendarManager() }
+            var year by remember { mutableStateOf(calendarManager.getCurrentYear()) }
+            var month by remember { mutableStateOf(calendarManager.getCurrentMonth()) }
+
+            Box(
+                modifier = Modifier.fillMaxWidth()
+                    .systemBarsPadding(),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                //Центрированная плашка с месяцем
+                CalendarHeader(
+                    modifier = Modifier.padding(top = 30.dp),
+                    calendarManager = calendarManager,
+                    year = year,
+                    month = month,
+                    onHeaderClick = {
+                        month = calendarManager.getCurrentMonth()
+                        year = calendarManager.getCurrentYear()
+                    }
+                )
+                //Кнопка настроек оверлапом в правый верх
+                Box(
+                    modifier = Modifier.fillMaxWidth()
+                        .padding(end = 18.dp),
+                    contentAlignment = Alignment.TopEnd
+                ) {
+                    SettingsButton(
+                        isSettingsOpen = showSettings,
+                        onClick = {showSettings = true}
+                    )
+
+                    if (showSettings) {
+                        SettingsCard(
+                            onDismiss = { showSettings = false }
+                        )
+                    }
+                }
+            }
+
+            CalendarWindow(
+                modifier = Modifier.padding(top = 16.dp),
                 calendarManager = calendarManager,
                 year = year,
                 month = month,
-                onHeaderClick = {
-                    month = calendarManager.getCurrentMonth()
-                    year = calendarManager.getCurrentYear()
-                }
+                onMonthChangeUp = {
+                    if (month == 12) {
+                        year++
+                        month = 1
+                    }
+                    else month++
+                },
+                onMonthChangeDown = {
+                    if (month == 1) {
+                        year--
+                        month = 12
+                    }
+                    else month--
+                },
+                onCalendarDaySelect = onCalendarDaySelect
             )
-            //Кнопка настроек оверлапом в правый верх
-            Box(
-                modifier = Modifier.fillMaxWidth()
-                    .padding(end = 18.dp),
-                contentAlignment = Alignment.TopEnd
-            ) {
-                SettingsButton {
-                    showSettings = !showSettings
-                }
-            }
+
+            StickyNotesArea(
+                modifier = Modifier.padding(horizontal = 15.dp)
+            )
         }
-
-        CalendarWindow(
-            modifier = Modifier.padding(top = 16.dp),
-            calendarManager = calendarManager,
-            year = year,
-            month = month,
-            onMonthChangeUp = {
-                if (month == 12) {
-                    year++
-                    month = 1
-                }
-                else month++
-            },
-            onMonthChangeDown = {
-                if (month == 1) {
-                    year--
-                    month = 12
-                }
-                else month--
-            },
-            onCalendarDaySelect = onCalendarDaySelect
-        )
-
-        StickyNotesArea(
-            modifier = Modifier.padding(horizontal = 15.dp)
-        )
     }
 }
 
@@ -255,7 +303,7 @@ fun CalendarElement(
             .clip(RoundedCornerShape(15.dp))
             .background(
                 color = if (isToday) LightOrange
-                        else Color.Unspecified
+                else Color.Unspecified
             )
             .clickable(
                 enabled = num != null,
@@ -267,7 +315,7 @@ fun CalendarElement(
             modifier = modifier,
             text = num?.toString() ?: "",
             fontFamily = if (isToday) getInterFont(InterFontType.EXTRA_BOLD)
-                else getInterFont(InterFontType.REGULAR),
+            else getInterFont(InterFontType.REGULAR),
             fontSize = if (isToday) 22.sp else 20.sp,
             color = if (isToday) DarkOrange else DarkGreen
         )
@@ -304,7 +352,7 @@ fun StickyNotesArea(
             itemsIndexed(stickyNotes) { index, note ->
                 StickyNoteElement(
                     modifier = if (index == 0 || index == 1) Modifier.padding(top = 20.dp)
-                                else Modifier,
+                    else Modifier,
                     stickyNote = note,
                     onStickyNoteClick = {
                         showStickyNotePage = true
@@ -315,8 +363,8 @@ fun StickyNotesArea(
             item {
                 StickyNoteAddingButton(
                     modifier = if(stickyNotes.isEmpty() || stickyNotes.size == 1)
-                                    Modifier.padding(bottom = 26.dp, top = 20.dp)
-                               else Modifier.padding(bottom = 26.dp),
+                        Modifier.padding(bottom = 26.dp, top = 20.dp)
+                    else Modifier.padding(bottom = 26.dp),
                     onClick = { showStickyNotePage = true }
                 )
             }
