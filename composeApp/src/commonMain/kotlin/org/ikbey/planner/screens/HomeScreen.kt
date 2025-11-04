@@ -96,10 +96,28 @@ fun HomeScreen(
         try {
             val date = formatDate(selectedYear, selectedMonth, selectedDay)
             val loadedNotes = localDb.getUserNotesByDate(date)
-            notes = loadedNotes
+
+            notes = loadedNotes.sortedWith { note1, note2 ->
+                compareNotesAdvanced(note1, note2)
+            }
         } catch (e: Exception) {
             println("ERROR: Ошибка загрузки заметок: ${e.message}")
         }
+    }
+
+    val toggleNoteDone = { noteId: Int, isDone: Boolean ->
+        coroutineScope.launch {
+            try {
+                localDb.updateUserNoteIsDone(noteId, isDone)
+                isListChanged = !isListChanged // Обновляем список
+            } catch (e: Exception) {
+                println("ERROR: Ошибка при обновлении состояния заметки: ${e.message}")
+            }
+        }
+    }
+
+    val onToggleNoteDone: (Int, Boolean) -> Unit = { noteId, isDone ->
+        toggleNoteDone(noteId, isDone)
     }
 
     val bottomSheetOffset by animateDpAsState(
@@ -180,7 +198,6 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Область для отображения заметок с градиентным оверлеем
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -193,12 +210,12 @@ fun HomeScreen(
                         selectedNote = note
                         showNoteDetail = true
                     },
+                    onToggleNoteDone = onToggleNoteDone,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 10.dp)
                 )
 
-                // Градиентный оверлей (только при скролле)
                 if (showTopGradient) {
                     Box(
                         modifier = Modifier
@@ -215,7 +232,6 @@ fun HomeScreen(
                     )
                 }
 
-                // Градиентный оверлей снизу (всегда)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -313,6 +329,7 @@ fun NotesSection(
     notes: List<Note>,
     scrollState: ScrollState,
     onNoteClick: (Note) -> Unit,
+    onToggleNoteDone: (Int, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -324,7 +341,10 @@ fun NotesSection(
             notes.forEach { note ->
                 NoteCard(
                     note = note,
-                    onNoteClick = { onNoteClick(note) }
+                    onNoteClick = { onNoteClick(note) },
+                    onToggleDone = { isDone ->
+                        onToggleNoteDone(note.id, isDone)
+                    }
                 )
             }
         } else {
@@ -353,9 +373,10 @@ fun NotesSection(
 @Composable
 fun NoteCard(
     note: Note,
-    onNoteClick: () -> Unit
+    onNoteClick: () -> Unit,
+    onToggleDone: (Boolean) -> Unit
 ) {
-    var isCompleted by remember { mutableStateOf(false) }
+    val isCompleted = note.is_done
     val cardColor = if (isCompleted) LightGreen else Orange
     val textColor = if (isCompleted) DarkGreen else Black
     val buttonColor = if (isCompleted) DarkGreen else Color.Transparent
@@ -365,12 +386,12 @@ fun NoteCard(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 80.dp, max = 400.dp)
+            .clickable { onNoteClick() }
             .background(
                 color = cardColor,
                 shape = RoundedCornerShape(16.dp)
             )
             .padding(horizontal = 10.dp, vertical = 16.dp)
-            .clickable { onNoteClick() }
     ) {
         Row(
             modifier = Modifier
@@ -458,8 +479,9 @@ fun NoteCard(
                 .size(25.dp)
                 .align(Alignment.CenterEnd)
                 .offset(x = (-5).dp)
+                .clip(CircleShape)
                 .clickable {
-                    isCompleted = !isCompleted
+                    onToggleDone(!isCompleted)
                 }
                 .background(
                     color = buttonColor,
@@ -475,24 +497,22 @@ fun NoteCard(
 }
 
 private fun getHeaderAndBody(note: Note): Pair<String, String> {
-    // Если есть отдельный заголовок в note.header и текст в note.note
+
     if (!note.header.isNullOrEmpty() && !note.note.isNullOrEmpty()) {
         return note.header to note.note
     }
-    // Если есть только заголовок
+
     else if (!note.header.isNullOrEmpty() && note.note.isNullOrEmpty()) {
         return note.header to ""
     }
-    // Если есть только текст (note.note)
+
     else if (note.header.isNullOrEmpty() && !note.note.isNullOrEmpty()) {
         val lines = note.note.split('\n')
         return when {
             lines.size == 1 -> {
-                // Если одна строка - весь текст идет в заголовок
                 note.note to ""
             }
             lines.size >= 2 -> {
-                // Первая строка - заголовок, остальное - текст
                 val header = lines[0]
                 val body = lines.subList(1, lines.size).joinToString("\n")
                 header to body
@@ -500,7 +520,7 @@ private fun getHeaderAndBody(note: Note): Pair<String, String> {
             else -> "" to ""
         }
     }
-    // Если нет ничего
+
     else {
         return "" to ""
     }
@@ -518,7 +538,7 @@ fun NoteDetailDialog(
 
     var startTime by remember { mutableStateOf(note.start_time ?: "") }
     var endTime by remember { mutableStateOf(note.end_time ?: "") }
-    var location by remember { mutableStateOf(note.header ?: "") }
+    var location by remember { mutableStateOf(note.place ?: "") }
     var noteText by remember { mutableStateOf(
         if (!note.header.isNullOrEmpty() && !note.note.isNullOrEmpty()) {
             "${note.header}\n${note.note}"
@@ -528,12 +548,33 @@ fun NoteDetailDialog(
     ) }
     var isInterval by remember { mutableStateOf(!note.end_time.isNullOrEmpty()) }
     var isNotification by remember { mutableStateOf(note.is_notifications_enabled == true) }
-    var hasChanges by remember { mutableStateOf(false) }
 
-    val saveChanges = {
-        if (hasChanges) {
+    var timeError by remember { mutableStateOf(false) }
+    var noteError by remember { mutableStateOf(false) }
+
+    val originalNote = remember { note }
+
+    val canSaveChanges = remember(startTime, endTime, noteText, isInterval) {
+        val isStartTimeValid = isValidTime(startTime)
+        val isEndTimeValid = if (isInterval) isValidTime(endTime) else true
+
+        isStartTimeValid && isEndTimeValid && noteText.isNotBlank()
+    }
+
+    val saveChangesIfValid = {
+        val hasTimeError = if (isInterval) {
+            !isValidTime(startTime) || !isValidTime(endTime)
+        } else {
+            !isValidTime(startTime)
+        }
+        val hasNoteError = noteText.isBlank()
+
+        timeError = hasTimeError
+        noteError = hasNoteError
+
+        if (!hasTimeError && !hasNoteError) {
             coroutineScope.launch {
-                val updatedNote = createUpdatedNote(note, startTime, endTime, location, noteText, isInterval, isNotification)
+                val updatedNote = createUpdatedNote(originalNote, startTime, endTime, location, noteText, isInterval, isNotification)
                 onUpdate(updatedNote)
             }
         }
@@ -541,7 +582,7 @@ fun NoteDetailDialog(
 
     Dialog(
         onDismissRequest = {
-            saveChanges()
+            saveChangesIfValid()
             onDismiss()
         },
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -578,13 +619,25 @@ fun NoteDetailDialog(
                     isInterval = isInterval,
                     onStartTimeChange = {
                         startTime = it
-                        hasChanges = true
+                        timeError = !isValidTime(it) || (isInterval && !isValidTime(endTime))
                     },
                     onEndTimeChange = {
                         endTime = it
-                        hasChanges = true
+                        timeError = !isValidTime(startTime) || (isInterval && !isValidTime(it))
                     },
                     modifier = Modifier.weight(1f)
+                )
+            }
+
+            if (timeError) {
+                Text(
+                    text = if (isInterval) "Укажите время полностью" else "Укажите время полностью",
+                    color = DarkGreen,
+                    fontSize = 14.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 26.dp)
+                        .padding(top = 4.dp)
                 )
             }
 
@@ -610,7 +663,11 @@ fun NoteDetailDialog(
                     checked = isInterval,
                     onCheckedChange = {
                         isInterval = it
-                        hasChanges = true
+                        if (it) {
+                            timeError = !isValidTime(startTime) || !isValidTime(endTime)
+                        } else {
+                            timeError = !isValidTime(startTime)
+                        }
                     },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = DarkGreen,
@@ -623,15 +680,20 @@ fun NoteDetailDialog(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            Text(
-                text = "Заметка",
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 26.dp),
-                fontFamily = getInterFont(InterFontType.REGULAR),
-                fontSize = 24.sp,
-                color = Color.Black
-            )
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Заметка",
+                    fontFamily = getInterFont(InterFontType.REGULAR),
+                    fontSize = 24.sp,
+                    color = Color.Black
+                )
+
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -655,10 +717,7 @@ fun NoteDetailDialog(
 
                 SimpleLocationField(
                     value = location,
-                    onValueChange = {
-                        location = it
-                        hasChanges = true
-                    },
+                    onValueChange = { location = it },
                     modifier = Modifier.fillMaxWidth(0.9f)
                 )
             }
@@ -669,7 +728,7 @@ fun NoteDetailDialog(
                 value = noteText,
                 onValueChange = {
                     noteText = it
-                    hasChanges = true
+                    noteError = it.isBlank()
                 },
                 placeholder = "Заголовок",
                 modifier = Modifier
@@ -693,10 +752,7 @@ fun NoteDetailDialog(
                 ) {
                     Switch(
                         checked = isNotification,
-                        onCheckedChange = {
-                            isNotification = it
-                            hasChanges = true
-                        },
+                        onCheckedChange = { isNotification = it },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = DarkGreen,
                             checkedTrackColor = SwitchGreen,
@@ -711,15 +767,22 @@ fun NoteDetailDialog(
                         color = DarkGreen
                     )
                 }
-                Icon(
-                    imageVector = Icons.trash,
-                    contentDescription = "Удалить заметку",
+
+                Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(48.dp)
+                        .clip(CircleShape) // ← Обрезаем по кругу
                         .clickable { onDelete() }
-                        .padding(8.dp),
-                    tint = DarkGreen
-                )
+                        .background(Color.Transparent),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.trash,
+                        contentDescription = "Удалить заметку",
+                        modifier = Modifier.size(24.dp),
+                        tint = DarkGreen
+                    )
+                }
             }
         }
     }
@@ -750,10 +813,52 @@ private fun createUpdatedNote(
     return originalNote.copy(
         start_time = startTime,
         end_time = if (isInterval && endTime.isNotEmpty()) endTime else null,
-        header = if (location.isNotEmpty()) location else header,
-        note = body,
-        is_notifications_enabled = isNotification
+        place = if (location.isNotEmpty()) location else null,
+        header = if (header.isNotEmpty()) header else null,
+        note = if (body.isNotEmpty()) body else null,
+        is_notifications_enabled = isNotification,
+        is_done = originalNote.is_done
     )
+}
+
+private fun timeToMinutes(time: String): Int {
+    if (time.isEmpty() || time.length != 5 || time[2] != ':') return Int.MAX_VALUE
+
+    return try {
+        val (hours, minutes) = time.split(":").map { it.toInt() }
+        hours * 60 + minutes
+    } catch (e: Exception) {
+        Int.MAX_VALUE
+    }
+}
+
+private fun compareNotesAdvanced(note1: Note, note2: Note): Int {
+    val time1 = note1.start_time ?: ""
+    val time2 = note2.start_time ?: ""
+
+    val startTime1 = timeToMinutes(time1)
+    val startTime2 = timeToMinutes(time2)
+
+    if (startTime1 != startTime2) {
+        return startTime1.compareTo(startTime2)
+    }
+
+    val hasInterval1 = !note1.end_time.isNullOrEmpty()
+    val hasInterval2 = !note2.end_time.isNullOrEmpty()
+
+    if (hasInterval1 != hasInterval2) {
+        return if (!hasInterval1) -1 else 1
+    }
+
+    if (hasInterval1 && hasInterval2) {
+        val endTime1 = timeToMinutes(note1.end_time ?: "")
+        val endTime2 = timeToMinutes(note2.end_time ?: "")
+        if (endTime1 != endTime2) {
+            return endTime1.compareTo(endTime2)
+        }
+    }
+
+    return note1.id.compareTo(note2.id)
 }
 
 
@@ -919,10 +1024,22 @@ fun BottomSheetMenu(
     var isInterval by remember { mutableStateOf(false) }
     var isNotification by remember { mutableStateOf(false) }
 
+    // Состояние для ошибок валидации
+    var timeError by remember { mutableStateOf(false) }
+    var noteError by remember { mutableStateOf(false) }
+
+    // Проверяем, можно ли добавить заметку
+    val canAddNote = remember(startTime, endTime, note, isInterval) {
+        val isStartTimeValid = isValidTime(startTime)
+        val isEndTimeValid = if (isInterval) isValidTime(endTime) else true
+
+        isStartTimeValid && isEndTimeValid && note.isNotBlank()
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .height(480.dp)
+            .height(500.dp)
             .background(
                 color = LightGreen,
                 shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
@@ -949,9 +1066,27 @@ fun BottomSheetMenu(
                 startTime = startTime,
                 endTime = endTime,
                 isInterval = isInterval,
-                onStartTimeChange = { startTime = it },
-                onEndTimeChange = { endTime = it },
+                onStartTimeChange = {
+                    startTime = it
+                    timeError = !isValidTime(it) || (isInterval && !isValidTime(endTime))
+                },
+                onEndTimeChange = {
+                    endTime = it
+                    timeError = !isValidTime(startTime) || (isInterval && !isValidTime(it))
+                },
                 modifier = Modifier.weight(1f)
+            )
+        }
+
+        if (timeError) {
+            Text(
+                text = if (isInterval) "Укажите время полностью" else "Укажите время полностью",
+                color = DarkGreen,
+                fontSize = 14.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 26.dp)
+                    .padding(top = 4.dp)
             )
         }
 
@@ -975,7 +1110,14 @@ fun BottomSheetMenu(
 
             Switch(
                 checked = isInterval,
-                onCheckedChange = { isInterval = it },
+                onCheckedChange = {
+                    isInterval = it
+                    if (it) {
+                        timeError = !isValidTime(startTime) || !isValidTime(endTime)
+                    } else {
+                        timeError = !isValidTime(startTime)
+                    }
+                },
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = DarkGreen,
                     checkedTrackColor = SwitchGreen,
@@ -987,15 +1129,20 @@ fun BottomSheetMenu(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        Text(
-            text = "Заметка",
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 26.dp),
-            fontFamily = getInterFont(InterFontType.REGULAR),
-            fontSize = 24.sp,
-            color = Color.Black
-        )
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Заметка",
+                fontFamily = getInterFont(InterFontType.REGULAR),
+                fontSize = 24.sp,
+                color = Color.Black
+            )
+
+        }
 
         Spacer(modifier = Modifier.height(10.dp))
 
@@ -1026,7 +1173,10 @@ fun BottomSheetMenu(
 
         SimpleInputField(
             value = note,
-            onValueChange = { note = it },
+            onValueChange = {
+                note = it
+                noteError = it.isBlank()
+            },
             placeholder = "Заголовок",
             modifier = Modifier
                 .fillMaxWidth()
@@ -1067,28 +1217,43 @@ fun BottomSheetMenu(
 
             Button(
                 onClick = {
-                    val noteData = NoteData(
-                        startTime = startTime,
-                        endTime = if (isInterval) endTime else "",
-                        location = location,
-                        note = note,
-                        isInterval = isInterval,
-                        isNotification = isNotification
-                    )
-                    onAddNoteClick(noteData)
-                    onDismiss()
+                    val hasTimeError = if (isInterval) {
+                        !isValidTime(startTime) || !isValidTime(endTime)
+                    } else {
+                        !isValidTime(startTime)
+                    }
+                    val hasNoteError = note.isBlank()
+
+                    timeError = hasTimeError
+                    noteError = hasNoteError
+
+                    if (!hasTimeError && !hasNoteError) {
+                        val noteData = NoteData(
+                            startTime = startTime,
+                            endTime = if (isInterval) endTime else "",
+                            location = location,
+                            note = note,
+                            isInterval = isInterval,
+                            isNotification = isNotification
+                        )
+                        onAddNoteClick(noteData)
+                        onDismiss()
+                    }
                 },
                 modifier = Modifier
                     .heightIn(min = 45.dp)
                     .widthIn(min = 120.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = LightOrange),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (canAddNote) LightOrange else LightGray
+                ),
+                enabled = canAddNote,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 Text(
                     "Добавить",
                     fontFamily = getInterFont(InterFontType.BOLD),
                     fontSize = 20.sp,
-                    color = DarkOrange,
+                    color = if (canAddNote) DarkOrange else SwitchGrayContour,
                     maxLines = 1
                 )
             }
@@ -1437,6 +1602,15 @@ fun SimpleInputField(
     }
 }
 
+fun isValidTime(time: String): Boolean {
+    if (time.length != 5) return false
+    if (time[2] != ':') return false
+
+    val hours = time.substring(0, 2).toIntOrNull() ?: return false
+    val minutes = time.substring(3, 5).toIntOrNull() ?: return false
+
+    return hours in 0..23 && minutes in 0..59
+}
 
 @Preview(showBackground = true)
 @Composable
