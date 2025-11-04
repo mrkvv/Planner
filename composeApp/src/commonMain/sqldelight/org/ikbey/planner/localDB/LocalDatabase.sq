@@ -19,7 +19,9 @@ CREATE TABLE calendar_events (
     end_time TEXT NOT NULL,
     location TEXT,
     creator TEXT NOT NULL,
-    calendar_name TEXT NOT NULL
+    calendar_name TEXT NOT NULL,
+    is_tracked INTEGER NOT NULL DEFAULT 0,
+    is_done INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE user_schedule (
@@ -32,18 +34,20 @@ CREATE TABLE user_schedule (
     start_time TEXT NOT NULL,
     end_time TEXT NOT NULL,
     teacher TEXT,
-    audithory TEXT
+    audithory TEXT,
+    is_done INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE user_notes (
     id INTEGER PRIMARY KEY,
-    lesson_id INTEGER,
     date TEXT,
+    place TEXT,
     header TEXT,
     note TEXT,
     is_notifications_enabled INTEGER,
     start_time TEXT,
-    end_time TEXT
+    end_time TEXT,
+    is_done INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE user_sticky_notes (
@@ -101,10 +105,23 @@ SELECT calendar_events.* FROM calendar_events WHERE date = ?;
 selectCalendarEventsByDateRange:
 SELECT calendar_events.* FROM calendar_events WHERE date BETWEEN ? AND ?;
 
+selectTrackedCalendarEvents:
+SELECT calendar_events.* FROM calendar_events WHERE is_tracked = 1;
+
+selectTrackedCalendarEventsByDate:
+SELECT calendar_events.* FROM calendar_events
+WHERE date = ? AND is_tracked = 1;
+
+updateCalendarEventTracking:
+UPDATE calendar_events SET is_tracked = ? WHERE id = ?;
+
+updateCalendarEventIsDone:
+UPDATE calendar_events SET is_done = ? WHERE id = ?;
+
 insertCalendarEvent:
 INSERT OR REPLACE INTO calendar_events
-(id, title, description, date, start_time, end_time, location, creator, calendar_name)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+(id, title, description, date, start_time, end_time, location, creator, calendar_name, is_tracked, is_done)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 deleteCalendarEvent:
 DELETE FROM calendar_events WHERE id = ?;
@@ -125,10 +142,13 @@ SELECT user_schedule.* FROM user_schedule WHERE date = ?;
 selectUserScheduleByDateRange:
 SELECT user_schedule.* FROM user_schedule WHERE date BETWEEN ? AND ?;
 
+updateUserScheduleIsDone:
+UPDATE user_schedule SET is_done = ? WHERE id = ?;
+
 insertUserSchedule:
 INSERT OR REPLACE INTO user_schedule
-(id, group_id, date, weekday, subject, type, start_time, end_time, teacher, audithory)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+(id, group_id, date, weekday, subject, type, start_time, end_time, teacher, audithory, is_done)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 deleteUserSchedule:
 DELETE FROM user_schedule;
@@ -140,16 +160,16 @@ DELETE FROM user_schedule;
 selectAllUserNotes:
 SELECT user_notes.* FROM user_notes;
 
-selectUserNotesByLesson:
-SELECT user_notes.* FROM user_notes WHERE lesson_id = ?;
-
 selectUserNotesByDate:
 SELECT user_notes.* FROM user_notes WHERE date = ?;
 
+updateUserNoteIsDone:
+UPDATE user_notes SET is_done = ? WHERE id = ?;
+
 insertUserNote:
 INSERT OR REPLACE INTO user_notes
-(id, lesson_id, date, header, note, is_notifications_enabled, start_time, end_time)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+(id, date, place, header, note, is_notifications_enabled, start_time, end_time, is_done)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 deleteUserNote:
 DELETE FROM user_notes WHERE id = ?;
