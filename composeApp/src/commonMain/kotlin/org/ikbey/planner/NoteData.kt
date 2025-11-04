@@ -6,5 +6,6 @@ data class NoteData(
     val location: String,
     val note: String,
     val isInterval: Boolean,
-    val isNotification: Boolean = false
+    val isNotification: Boolean = false,
+    val date: String? = null // Добавим поле для даты
 )
