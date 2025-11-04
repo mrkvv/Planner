@@ -40,8 +40,8 @@ CREATE TABLE user_schedule (
 
 CREATE TABLE user_notes (
     id INTEGER PRIMARY KEY,
-    lesson_id INTEGER,
     date TEXT,
+    place TEXT,
     header TEXT,
     note TEXT,
     is_notifications_enabled INTEGER,
@@ -160,9 +160,6 @@ DELETE FROM user_schedule;
 selectAllUserNotes:
 SELECT user_notes.* FROM user_notes;
 
-selectUserNotesByLesson:
-SELECT user_notes.* FROM user_notes WHERE lesson_id = ?;
-
 selectUserNotesByDate:
 SELECT user_notes.* FROM user_notes WHERE date = ?;
 
@@ -171,7 +168,7 @@ UPDATE user_notes SET is_done = ? WHERE id = ?;
 
 insertUserNote:
 INSERT OR REPLACE INTO user_notes
-(id, lesson_id, date, header, note, is_notifications_enabled, start_time, end_time, is_done)
+(id, date, place, header, note, is_notifications_enabled, start_time, end_time, is_done)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 deleteUserNote:

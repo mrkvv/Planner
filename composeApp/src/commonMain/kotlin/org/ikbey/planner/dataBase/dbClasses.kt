@@ -37,8 +37,8 @@ data class Schedule(
 @Serializable
 data class Note(
     val id: Int,
-    val lesson_id: Int? = null,
     val date: String? = null,
+    val place: String? = null,
     val header: String? = null,
     val note: String? = null,
     val is_notifications_enabled: Boolean? = null,

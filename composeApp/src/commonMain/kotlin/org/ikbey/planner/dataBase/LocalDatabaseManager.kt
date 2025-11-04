@@ -335,26 +335,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
             query.selectAllUserNotes().executeAsList().map { note ->
                 Note(
                     id = note.id.toInt(),
-                    lesson_id = note.lesson_id?.toInt(),
                     date = note.date,
-                    header = note.header_,
-                    note = note.note,
-                    is_notifications_enabled = note.is_notifications_enabled?.toInt() != 0,
-                    start_time = note.start_time,
-                    end_time = note.end_time,
-                    is_done = note.is_done.toInt() == 1
-                )
-            }
-        }
-    }
-
-    suspend fun getUserNotesByLesson(lessonId: Int): List<Note> {
-        return withContext(Dispatchers.IO) {
-            query.selectUserNotesByLesson(lessonId.toLong()).executeAsList().map { note ->
-                Note(
-                    id = note.id.toInt(),
-                    lesson_id = note.lesson_id?.toInt(),
-                    date = note.date,
+                    place = note.place,
                     header = note.header_,
                     note = note.note,
                     is_notifications_enabled = note.is_notifications_enabled?.toInt() != 0,
@@ -371,8 +353,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
             query.selectUserNotesByDate(date).executeAsList().map { note ->
                 Note(
                     id = note.id.toInt(),
-                    lesson_id = note.lesson_id?.toInt(),
                     date = note.date,
+                    place = note.place,
                     header = note.header_,
                     note = note.note,
                     is_notifications_enabled = note.is_notifications_enabled?.toInt() != 0,
@@ -397,8 +379,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
         withContext(Dispatchers.IO) {
             query.insertUserNote(
                 id = note.id.toLong(),
-                lesson_id = note.lesson_id?.toLong(),
                 date = note.date,
+                place = note.place,
                 header_ = note.header,
                 note = note.note,
                 is_notifications_enabled = if (note.is_notifications_enabled == true) 1 else 0,
