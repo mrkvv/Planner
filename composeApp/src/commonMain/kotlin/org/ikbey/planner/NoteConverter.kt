@@ -10,11 +10,22 @@ fun formatDate(year: Int, month: Int, day: Int): String {
     println("DEBUG: Форматированная дата: $result")
     return result
 }
+
+// Функция для форматирования времени (убираем секунды)
+fun formatTime(timeString: String): String {
+    return if (timeString.length > 5) {
+        timeString.substring(0, 5) // Берем только "HH:MM"
+    } else {
+        timeString
+    }
+}
+
 fun generateNoteId(): Int {
     return Random.nextInt(1000, 9999)
 }
 
-fun NoteData.toNote(): Note {
+// Конвертер для пользовательских заметок
+fun NoteData.toUserNote(): Note {
     // Разделяем текст на заголовок и описание
     val lines = this.note.split('\n')
     val (header, body) = when {
@@ -32,11 +43,142 @@ fun NoteData.toNote(): Note {
     return Note(
         id = generateNoteId(),
         date = this.date,
-        place = this.location, // ← ИСПРАВЛЕНО: location идет в place
+        place = this.location,
         header = if (header.isNotEmpty()) header else null,
         note = if (body.isNotEmpty()) body else null,
         is_notifications_enabled = this.isNotification,
         start_time = this.startTime,
         end_time = if (this.isInterval) this.endTime else null
+    )
+}
+
+// Конвертер для расписания в NoteData
+fun org.ikbey.planner.dataBase.Schedule.toNoteData(): NoteData {
+    val noteText = buildString {
+        append(subject)
+        if (!type.isNullOrEmpty()) {
+            append(" ($type)")
+        }
+        if (!teacher.isNullOrEmpty()) {
+            append("\nПреподаватель: $teacher")
+        }
+        if (!audithory.isNullOrEmpty()) {
+            append("\nАудитория: $audithory")
+        }
+    }
+
+    return NoteData(
+        startTime = formatTime(start_time), // Форматируем время
+        endTime = formatTime(end_time),     // Форматируем время
+        location = audithory ?: "",
+        note = noteText,
+        isInterval = true,
+        isNotification = false,
+        date = date,
+        type = NoteType.SCHEDULE
+    )
+}
+
+// Конвертер для расписания в Note (для отображения)
+fun org.ikbey.planner.dataBase.Schedule.toNote(): Note {
+    val noteText = buildString {
+        if (!teacher.isNullOrEmpty()) {
+            append("Преподаватель: $teacher")
+        }
+        if (!audithory.isNullOrEmpty()) {
+            if (!teacher.isNullOrEmpty()) append("\n")
+            append("Аудитория: $audithory")
+        }
+    }
+
+    return Note(
+        id = id,
+        date = date,
+        place = audithory,
+        header = "$subject${if (!type.isNullOrEmpty()) " ($type)" else ""}",
+        note = if (noteText.isNotEmpty()) noteText else null,
+        is_notifications_enabled = false,
+        start_time = formatTime(start_time),
+        end_time = formatTime(end_time),
+        is_done = is_done // Важно: передаем состояние выполнения
+    )
+}
+
+
+// Конвертер для мероприятий в NoteData
+fun org.ikbey.planner.dataBase.CalendarEvent.toNoteData(): NoteData {
+    val noteText = buildString {
+        append(title)
+        if (!description.isNullOrEmpty()) {
+            append("\n$description")
+        }
+        if (!location.isNullOrEmpty()) {
+            append("\nМесто: $location")
+        }
+        if (!creator.isNullOrEmpty()) {
+            append("\nОрганизатор: $creator")
+        }
+    }
+
+    return NoteData(
+        startTime = formatTime(start_time), // Форматируем время
+        endTime = formatTime(end_time),     // Форматируем время
+        location = location ?: "",
+        note = noteText,
+        isInterval = true,
+        isNotification = false,
+        date = date,
+        type = NoteType.CALENDAR_EVENT
+    )
+}
+
+// Конвертер для мероприятий в Note (для отображения)
+fun org.ikbey.planner.dataBase.CalendarEvent.toNote(): Note {
+    val noteText = buildString {
+        if (!description.isNullOrEmpty()) {
+            append(description)
+        }
+        if (!location.isNullOrEmpty()) {
+            if (!description.isNullOrEmpty()) append("\n")
+            append("Место: $location")
+        }
+        if (!creator.isNullOrEmpty()) {
+            if (!description.isNullOrEmpty() || !location.isNullOrEmpty()) append("\n")
+            append("Организатор: $creator")
+        }
+    }
+
+    return Note(
+        id = id,
+        date = date,
+        place = location,
+        header = title,
+        note = if (noteText.isNotEmpty()) noteText else null,
+        is_notifications_enabled = false,
+        start_time = formatTime(start_time),
+        end_time = formatTime(end_time),
+        is_done = is_done // Важно: передаем состояние выполнения
+    )
+}
+
+// Функция для преобразования пользовательской заметки в NoteData (для редактирования)
+fun Note.toNoteData(): NoteData {
+    val fullText = buildString {
+        if (!header.isNullOrEmpty()) append(header)
+        if (!note.isNullOrEmpty()) {
+            if (!header.isNullOrEmpty()) append("\n")
+            append(note)
+        }
+    }
+
+    return NoteData(
+        startTime = start_time ?: "",
+        endTime = end_time ?: "",
+        location = place ?: "",
+        note = fullText,
+        isInterval = !end_time.isNullOrEmpty(),
+        isNotification = is_notifications_enabled == true,
+        date = date,
+        type = NoteType.USER_NOTE
     )
 }
