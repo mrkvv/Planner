@@ -21,6 +21,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -72,6 +73,8 @@ fun SettingsCard(
 
     var currentGroupId by remember { mutableStateOf<String?>(null) }
 
+    var isLoading by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         faculties.value = localDb.getFaculties()
 
@@ -103,13 +106,21 @@ fun SettingsCard(
     var showGroups by remember { mutableStateOf(false) }
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            if (!isLoading) {
+                onDismiss()
+            }
+        },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .clickable { onDismiss() }
+                .clickable {
+                    if (!isLoading) {
+                        onDismiss()
+                    }
+                }
         ) {
             Card(
                 modifier = Modifier
@@ -137,12 +148,18 @@ fun SettingsCard(
                         tempInstitute = tempInstitute,
                         showInstitutes = showInstitutes,
                         onInstituteSelected = { facultyId ->
-                            tempInstitute = facultyId
-                            tempGroup = ""
-                            showInstitutes = false
-                            showGroups = false
+                            if (!isLoading) {
+                                tempInstitute = facultyId
+                                tempGroup = ""
+                                showInstitutes = false
+                                showGroups = false
+                            }
                         },
-                        onToggleDropdown = { showInstitutes = !showInstitutes }
+                        onToggleDropdown = {
+                            if (!isLoading){
+                                showInstitutes = !showInstitutes
+                            }
+                        }
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -161,11 +178,13 @@ fun SettingsCard(
                         tempGroup = tempGroup,
                         showGroups = showGroups,
                         onGroupSelected = { groupId ->
-                            tempGroup = groupId
-                            showGroups = false
+                            if (!isLoading) {
+                                tempGroup = groupId
+                                showGroups = false
+                            }
                         },
                         onToggleDropdown = {
-                            if (tempInstitute.isNotBlank()) {
+                            if (!isLoading && tempInstitute.isNotBlank()) {
                                 showGroups = !showGroups
                             }
                         }
@@ -175,12 +194,16 @@ fun SettingsCard(
 
                     Button(
                         onClick = {
-                            if (tempGroup.isNotBlank()) {
+                            if (tempGroup.isNotBlank() && !isLoading) {
+                                isLoading = true
                                 coroutineScope.launch {
                                     syncManager.setGroupId(tempGroup.toInt())
+                                    isLoading = false
+                                    onDismiss()
                                 }
+                            } else if (!isLoading) {
+                                onDismiss()
                             }
-                            onDismiss()
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -188,15 +211,23 @@ fun SettingsCard(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Orange
                         ),
-                        enabled = tempInstitute.isNotBlank() && tempGroup.isNotBlank()
+                        enabled = !isLoading && tempInstitute.isNotBlank() && tempGroup.isNotBlank()
                     ) {
-                        Text(
-                            text = "Сохранить",
-                            fontFamily = getInterFont(InterFontType.REGULAR),
-                            fontSize = 20.sp,
-                            color = if (tempInstitute.isNotBlank() && tempGroup.isNotBlank()) DarkOrange else DarkGreen,
-                            fontWeight = FontWeight.Bold
-                        )
+
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = Color.White
+                            )
+                        } else {
+                            Text(
+                                text = "Сохранить",
+                                fontFamily = getInterFont(InterFontType.REGULAR),
+                                fontSize = 20.sp,
+                                color = if (tempInstitute.isNotBlank() && tempGroup.isNotBlank()) DarkOrange else DarkGreen,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
