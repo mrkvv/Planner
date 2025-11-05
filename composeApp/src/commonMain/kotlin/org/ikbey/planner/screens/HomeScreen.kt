@@ -9,7 +9,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,16 +44,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.ikbey.planner.*
-import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.ikbey.planner.Icons
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.LaunchedEffect
@@ -96,10 +91,10 @@ fun HomeScreen(
     var showAddNoteSheet by remember { mutableStateOf(false) }
     var showNoteDetail by remember { mutableStateOf(false) }
     var selectedNote by remember { mutableStateOf<Note?>(null) }
-    var selectedNoteData by remember { mutableStateOf<NoteData?>(null) } // Добавляем для хранения NoteData
+    var selectedNoteData by remember { mutableStateOf<NoteData?>(null) }
     var notes by remember { mutableStateOf<List<Note>>(emptyList()) }
-    var schedules by remember { mutableStateOf<List<org.ikbey.planner.dataBase.Schedule>>(emptyList()) } // Расписание
-    var calendarEvents by remember { mutableStateOf<List<org.ikbey.planner.dataBase.CalendarEvent>>(emptyList()) } // Мероприятия
+    var schedules by remember { mutableStateOf<List<Schedule>>(emptyList()) }
+    var calendarEvents by remember { mutableStateOf<List<CalendarEvent>>(emptyList()) }
     var isListChanged by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
@@ -111,7 +106,6 @@ fun HomeScreen(
         }
     }
 
-    // Загрузка пользовательских заметок
     LaunchedEffect(selectedYear, selectedMonth, selectedDay, isListChanged) {
         try {
             val date = formatDate(selectedYear, selectedMonth, selectedDay)
@@ -125,7 +119,6 @@ fun HomeScreen(
         }
     }
 
-    // Загрузка расписания
     LaunchedEffect(selectedYear, selectedMonth, selectedDay) {
         try {
             val date = formatDate(selectedYear, selectedMonth, selectedDay)
@@ -136,7 +129,6 @@ fun HomeScreen(
         }
     }
 
-    // Загрузка мероприятий
     LaunchedEffect(selectedYear, selectedMonth, selectedDay) {
         try {
             val date = formatDate(selectedYear, selectedMonth, selectedDay)
@@ -147,28 +139,46 @@ fun HomeScreen(
         }
     }
 
-// Объединяем все данные для отображения
     val allItems = remember(notes, schedules, calendarEvents) {
         val userNotes = notes.map { note ->
             note.toNoteData() to note
         }
-
         val scheduleNotes = schedules.map { schedule ->
             schedule.toNoteData() to schedule.toNote()
         }
-
         val eventNotes = calendarEvents.map { event ->
             event.toNoteData() to event.toNote()
         }
-
         (userNotes + scheduleNotes + eventNotes).sortedBy { (noteData, _) ->
             timeToMinutes(noteData.startTime)
+        }
+    }
+
+    val updateItemDoneState = { itemId: Int, isDone: Boolean, itemType: NoteType ->
+        when (itemType) {
+            NoteType.USER_NOTE -> {
+                notes = notes.map { note ->
+                    if (note.id == itemId) note.copy(is_done = isDone) else note
+                }
+            }
+            NoteType.SCHEDULE -> {
+                schedules = schedules.map { schedule ->
+                    if (schedule.id == itemId) schedule.copy(is_done = isDone) else schedule
+                }
+            }
+            NoteType.CALENDAR_EVENT -> {
+                calendarEvents = calendarEvents.map { event ->
+                    if (event.id == itemId) event.copy(is_done = isDone) else event
+                }
+            }
         }
     }
 
     val toggleNoteDone = { noteId: Int, isDone: Boolean, noteType: NoteType ->
         coroutineScope.launch {
             try {
+                updateItemDoneState(noteId, isDone, noteType)
+
                 when (noteType) {
                     NoteType.USER_NOTE -> {
                         localDb.updateUserNoteIsDone(noteId, isDone)
@@ -180,9 +190,9 @@ fun HomeScreen(
                         localDb.updateCalendarEventIsDone(noteId, isDone)
                     }
                 }
-                isListChanged = !isListChanged // Обновляем список
             } catch (e: Exception) {
                 println("ERROR: Ошибка при обновлении состояния: ${e.message}")
+                updateItemDoneState(noteId, !isDone, noteType)
             }
         }
     }
@@ -386,7 +396,7 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.7f))
-                .clickable { showAddNoteSheet = false } // ← Закрытие только по клику на затемнение
+                .clickable { showAddNoteSheet = false }
         ) {
             Column(
                 modifier = Modifier.fillMaxSize(),
@@ -399,7 +409,7 @@ fun HomeScreen(
                             try {
                                 val date = formatDate(selectedYear, selectedMonth, selectedDay)
                                 val noteWithDate = noteData.copy(date = date)
-                                val note = noteWithDate.toUserNote() // Используем новый конвертер
+                                val note = noteWithDate.toUserNote()
                                 localDb.insertUserNote(note)
                                 isListChanged = !isListChanged
                             } catch (e: Exception) {
@@ -414,7 +424,6 @@ fun HomeScreen(
         }
     }
 
-    // Обновляем диалог редактирования
     if (showNoteDetail && selectedNote != null && selectedNoteData != null) {
         NoteDetailDialog(
             note = selectedNote!!,
@@ -438,7 +447,6 @@ fun HomeScreen(
                         }
                     }
                 } else {
-                    // Для расписания и мероприятий просто закрываем диалог
                     showNoteDetail = false
                     selectedNote = null
                     selectedNoteData = null
@@ -455,7 +463,6 @@ fun HomeScreen(
                         }
                     }
                 }
-                // Для расписания и мероприятий обновление не разрешено
             }
         )
     }
@@ -466,7 +473,7 @@ fun NotesSection(
     items: List<Pair<NoteData, Note>>,
     scrollState: ScrollState,
     onNoteClick: (NoteData, Note) -> Unit,
-    onToggleNoteDone: (Int, Boolean, NoteType) -> Unit, // Изменяем сигнатуру
+    onToggleNoteDone: (Int, Boolean, NoteType) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -481,7 +488,6 @@ fun NotesSection(
                     noteData = noteData,
                     onNoteClick = { onNoteClick(noteData, note) },
                     onToggleDone = { isDone ->
-                        // Передаем тип заметки
                         onToggleNoteDone(note.id, isDone, noteData.type)
                     }
                 )
@@ -514,7 +520,7 @@ fun NoteCard(
     note: Note,
     noteData: NoteData,
     onNoteClick: () -> Unit,
-    onToggleDone: (Boolean) -> Unit // Оставляем без изменений
+    onToggleDone: (Boolean) -> Unit
 ) {
     val isCompleted = note.is_done
     val cardColor = if (isCompleted) LightGreen else Orange
@@ -614,7 +620,6 @@ fun NoteCard(
             }
         }
 
-        // Кнопка выполнения
         Box(
             modifier = Modifier
                 .size(25.dp)
@@ -639,17 +644,14 @@ fun NoteCard(
 
 
 private fun getHeaderAndBody(note: Note): Pair<String, String> {
-    // Для заметок, которые уже имеют разделенные header и note
     if (!note.header.isNullOrEmpty() && !note.note.isNullOrEmpty()) {
         return note.header to note.note
     }
 
-    // Для заметок, где есть только header
     else if (!note.header.isNullOrEmpty() && note.note.isNullOrEmpty()) {
         return note.header to ""
     }
 
-    // Для заметок, где есть только note - пытаемся разделить
     else if (note.header.isNullOrEmpty() && !note.note.isNullOrEmpty()) {
         val lines = note.note.split('\n')
         return when {
@@ -665,7 +667,6 @@ private fun getHeaderAndBody(note: Note): Pair<String, String> {
         }
     }
 
-    // Если ничего нет
     else {
         return "" to ""
     }
@@ -682,7 +683,6 @@ fun NoteDetailDialog(
 ) {
     val isEditable = noteData.type == NoteType.USER_NOTE
 
-    // Для нередактируемых заметок используем упрощенную версию
     if (!isEditable) {
         ReadOnlyNoteDetailDialog(
             note = note,
@@ -690,7 +690,6 @@ fun NoteDetailDialog(
             onDismiss = onDismiss
         )
     } else {
-        // Старая версия для пользовательских заметок
         EditableNoteDetailDialog(
             note = note,
             onDismiss = onDismiss,
@@ -706,6 +705,8 @@ fun ReadOnlyNoteDetailDialog(
     noteData: NoteData,
     onDismiss: () -> Unit
 ) {
+    val scrollState = rememberScrollState()
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -720,7 +721,6 @@ fun ReadOnlyNoteDetailDialog(
                 )
                 .padding(vertical = 20.dp, horizontal = 16.dp)
         ) {
-            // Заголовок с типом
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -732,31 +732,14 @@ fun ReadOnlyNoteDetailDialog(
                         NoteType.CALENDAR_EVENT -> "Мероприятие"
                         else -> "Заметка"
                     },
-                    fontFamily = getInterFont(InterFontType.BOLD),
-                    fontSize = 20.sp,
-                    color = Color.Black
+                    fontFamily = getInterFont(InterFontType.REGULAR),
+                    fontSize = 24.sp,
+                    color = Black
                 )
-
-                // Кнопка закрытия
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .clickable { onDismiss() }
-                        .background(Color.Transparent),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "×",
-                        fontSize = 24.sp,
-                        color = Color.Black
-                    )
-                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Время
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -764,8 +747,8 @@ fun ReadOnlyNoteDetailDialog(
                 Text(
                     text = "Время:",
                     fontFamily = getInterFont(InterFontType.REGULAR),
-                    fontSize = 18.sp,
-                    color = Color.Black
+                    fontSize = 20.sp,
+                    color = DarkGreen
                 )
 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -777,15 +760,14 @@ fun ReadOnlyNoteDetailDialog(
                         noteData.startTime
                     },
                     fontFamily = getInterFont(InterFontType.SEMI_BOLD),
-                    fontSize = 18.sp,
-                    color = Color.Black
+                    fontSize = 20.sp,
+                    color = Black
                 )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Место, если есть
-            if (!noteData.location.isNullOrEmpty()) {
+            if (noteData.location.isNotEmpty()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -793,8 +775,8 @@ fun ReadOnlyNoteDetailDialog(
                     Text(
                         text = "Место:",
                         fontFamily = getInterFont(InterFontType.REGULAR),
-                        fontSize = 18.sp,
-                        color = Color.Black
+                        fontSize = 20.sp,
+                        color = DarkGreen
                     )
 
                     Spacer(modifier = Modifier.width(8.dp))
@@ -802,15 +784,14 @@ fun ReadOnlyNoteDetailDialog(
                     Text(
                         text = noteData.location,
                         fontFamily = getInterFont(InterFontType.SEMI_BOLD),
-                        fontSize = 18.sp,
-                        color = Color.Black
+                        fontSize = 20.sp,
+                        color = Black
                     )
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // Заголовок и описание
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -819,6 +800,7 @@ fun ReadOnlyNoteDetailDialog(
                         color = Color.White,
                         shape = RoundedCornerShape(8.dp)
                     )
+                    .verticalScroll(scrollState)
                     .padding(12.dp)
             ) {
                 val (header, body) = getHeaderAndBody(note)
@@ -828,7 +810,7 @@ fun ReadOnlyNoteDetailDialog(
                         text = header,
                         fontFamily = getInterFont(InterFontType.SEMI_BOLD),
                         fontSize = 20.sp,
-                        color = Color.Black,
+                        color = Black,
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -841,8 +823,8 @@ fun ReadOnlyNoteDetailDialog(
                     Text(
                         text = body,
                         fontFamily = getInterFont(InterFontType.REGULAR),
-                        fontSize = 18.sp,
-                        color = Color.Black,
+                        fontSize = 20.sp,
+                        color = Black,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -851,7 +833,6 @@ fun ReadOnlyNoteDetailDialog(
     }
 }
 
-// Старая версия диалога переименовываем
 @Composable
 fun EditableNoteDetailDialog(
     note: Note,
@@ -880,14 +861,14 @@ fun EditableNoteDetailDialog(
 
     val originalNote = remember { note }
 
-    var intervalError by remember { mutableStateOf(false) } // ← ДОБАВИТЬ
+    var intervalError by remember { mutableStateOf(false) }
 
     val canSaveChanges = remember(startTime, endTime, noteText, isInterval) {
         val isStartTimeValid = isValidTime(startTime)
         val isEndTimeValid = if (isInterval) isValidTime(endTime) else true
-        val isIntervalValid = if (isInterval) isValidTimeInterval(startTime, endTime) else true // ← ДОБАВИТЬ
+        val isIntervalValid = if (isInterval) isValidTimeInterval(startTime, endTime) else true
 
-        isStartTimeValid && isEndTimeValid && isIntervalValid && noteText.isNotBlank() // ← ОБНОВИТЬ
+        isStartTimeValid && isEndTimeValid && isIntervalValid && noteText.isNotBlank()
     }
 
     val saveChangesIfValid = {
@@ -896,14 +877,14 @@ fun EditableNoteDetailDialog(
         } else {
             !isValidTime(startTime)
         }
-        val hasIntervalError = isInterval && !isValidTimeInterval(startTime, endTime) // ← ДОБАВИТЬ
+        val hasIntervalError = isInterval && !isValidTimeInterval(startTime, endTime)
         val hasNoteError = noteText.isBlank()
 
         timeError = hasTimeError
-        intervalError = hasIntervalError // ← ДОБАВИТЬ
+        intervalError = hasIntervalError
         noteError = hasNoteError
 
-        if (!hasTimeError && !hasIntervalError && !hasNoteError) { // ← ОБНОВИТЬ
+        if (!hasTimeError && !hasIntervalError && !hasNoteError) {
             coroutineScope.launch {
                 val updatedNote = createUpdatedNote(originalNote, startTime, endTime, location, noteText, isInterval, isNotification)
                 onUpdate(updatedNote)
@@ -951,12 +932,12 @@ fun EditableNoteDetailDialog(
                     onStartTimeChange = {
                         startTime = it
                         timeError = !isValidTime(it) || (isInterval && !isValidTime(endTime))
-                        intervalError = isInterval && !isValidTimeInterval(startTime, endTime) // ← НОВОЕ
+                        intervalError = isInterval && !isValidTimeInterval(startTime, endTime)
                     },
                     onEndTimeChange = {
                         endTime = it
                         timeError = !isValidTime(startTime) || (isInterval && !isValidTime(it))
-                        intervalError = isInterval && !isValidTimeInterval(startTime, endTime) // ← НОВОЕ
+                        intervalError = isInterval && !isValidTimeInterval(startTime, endTime)
                     },
                     modifier = Modifier.weight(1f)
                 )
@@ -965,7 +946,7 @@ fun EditableNoteDetailDialog(
             if (timeError || intervalError) {
                 Text(
                     text = when {
-                        intervalError -> "Время окончания должно быть позже начала"
+                        intervalError -> "Некорректный интервал"
                         timeError && isInterval -> "Укажите время полностью"
                         else -> "Укажите время полностью"
                     },
@@ -1002,7 +983,7 @@ fun EditableNoteDetailDialog(
                         isInterval = it
                         if (it) {
                             timeError = !isValidTime(startTime) || !isValidTime(endTime)
-                            intervalError = !isValidTimeInterval(startTime, endTime) // ← НОВОЕ
+                            intervalError = !isValidTimeInterval(startTime, endTime)
                         } else {
                             timeError = !isValidTime(startTime)
                             intervalError = false
@@ -1076,6 +1057,7 @@ fun EditableNoteDetailDialog(
                     .height(250.dp)
             )
 
+
             Spacer(modifier = Modifier.height(20.dp))
 
             Row(
@@ -1110,7 +1092,7 @@ fun EditableNoteDetailDialog(
                 Box(
                     modifier = Modifier
                         .size(48.dp)
-                        .clip(CircleShape) // ← Обрезаем по кругу
+                        .clip(CircleShape)
                         .clickable { onDelete() }
                         .background(Color.Transparent),
                     contentAlignment = Alignment.Center
@@ -1152,21 +1134,22 @@ private fun createUpdatedNote(
     return originalNote.copy(
         start_time = startTime,
         end_time = if (isInterval && endTime.isNotEmpty()) endTime else null,
-        place = if (location.isNotEmpty()) location else null,
-        header = if (header.isNotEmpty()) header else null,
-        note = if (body.isNotEmpty()) body else null,
+        place = location.ifEmpty { null },
+        header = header.ifEmpty { null },
+        note = body.ifEmpty { null },
         is_notifications_enabled = isNotification,
         is_done = originalNote.is_done
     )
 }
 
-private fun timeToMinutes(time: String): Int {
-    if (time.isEmpty() || time.length != 5 || time[2] != ':') return Int.MAX_VALUE
+private fun timeToMinutes(time: String?): Int {
+    if (time.isNullOrEmpty() || time.length != 5 || time[2] != ':') return Int.MAX_VALUE
 
     return try {
         val (hours, minutes) = time.split(":").map { it.toInt() }
         hours * 60 + minutes
     } catch (e: Exception) {
+        println("ERROR: Invalid time format: $time, error: ${e.message}")
         Int.MAX_VALUE
     }
 }
@@ -1199,8 +1182,8 @@ private fun compareNotesAdvanced(note1: Note, note2: Note): Int {
     }
 
     if (hasInterval1 && hasInterval2) {
-        val endTime1 = timeToMinutes(note1.end_time ?: "")
-        val endTime2 = timeToMinutes(note2.end_time ?: "")
+        val endTime1 = timeToMinutes(note1.end_time)
+        val endTime2 = timeToMinutes(note2.end_time)
         if (endTime1 != endTime2) {
             return endTime1.compareTo(endTime2)
         }
@@ -1272,7 +1255,6 @@ fun DaysScrollList(
 fun DayItem(day: Int, isSelected: Boolean = false, onClick: () -> Unit = {}) {
     val backgroundColor = if (isSelected) LightOrange else Color.Transparent
     val textColor = if (isSelected) DarkOrange else Color.Black
-
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(15.dp))
@@ -1303,7 +1285,6 @@ fun DayWeekText(
     modifier: Modifier = Modifier
 ) {
     val dayOfWeek = calendarManager.getDayOfWeekName(calendarManager.calculateDayOfWeek(year, month, day))
-
     Text(
         text = "$dayOfWeek, $day",
         modifier = modifier,
@@ -1374,7 +1355,6 @@ fun BottomSheetMenu(
     var noteError by remember { mutableStateOf(false) }
     var intervalError by remember { mutableStateOf(false) }
 
-    // Проверяем, можно ли добавить заметку
     val canAddNote = remember(startTime, endTime, note, isInterval) {
         val isStartTimeValid = isValidTime(startTime)
         val isEndTimeValid = if (isInterval) isValidTime(endTime) else true
@@ -1391,9 +1371,8 @@ fun BottomSheetMenu(
                 color = LightGreen,
                 shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
             )
-            .clickable { /* блокируем закрытие при клике на меню */ }
+            .clickable {}
     ) {
-        // Внутренний контейнер с padding
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -1434,11 +1413,10 @@ fun BottomSheetMenu(
                 )
             }
 
-            // ОБНОВЛЕННЫЙ блок ошибок:
             if (timeError || intervalError) {
                 Text(
                     text = when {
-                        intervalError -> "Время окончания должно быть позже начала"
+                        intervalError -> "Некорректный интервал"
                         timeError && isInterval -> "Укажите время полностью"
                         else -> "Укажите время полностью"
                     },
@@ -1646,7 +1624,7 @@ fun SimpleLocationField(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
-            textStyle = androidx.compose.ui.text.TextStyle(
+            textStyle = TextStyle(
                 fontFamily = getInterFont(InterFontType.REGULAR),
                 fontSize = 20.sp,
                 color = Color.Black
@@ -1759,7 +1737,7 @@ fun SingleTimeField(
                 onValueChange(formatted)
             },
             modifier = Modifier.fillMaxWidth(),
-            textStyle = androidx.compose.ui.text.TextStyle(
+            textStyle = TextStyle(
                 fontFamily = getInterFont(InterFontType.SEMI_BOLD),
                 fontSize = 20.sp,
                 textAlign = TextAlign.Center,
@@ -1815,7 +1793,7 @@ fun IntervalTimePart(
                 onValueChange(formatted)
             },
             modifier = Modifier.fillMaxWidth(),
-            textStyle = androidx.compose.ui.text.TextStyle(
+            textStyle = TextStyle(
                 fontFamily = getInterFont(InterFontType.SEMI_BOLD),
                 fontSize = 20.sp,
                 textAlign = TextAlign.Center,

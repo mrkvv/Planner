@@ -8,11 +8,9 @@ data class NoteData(
     val isInterval: Boolean,
     val isNotification: Boolean = false,
     val date: String? = null,
-    val type: NoteType = NoteType.USER_NOTE // Добавляем тип заметки
+    val type: NoteType = NoteType.USER_NOTE
 )
 
 enum class NoteType {
-    USER_NOTE,      // Пользовательская заметка
-    SCHEDULE,       // Расписание
-    CALENDAR_EVENT  // Мероприятие
+    USER_NOTE, SCHEDULE, CALENDAR_EVENT
 }

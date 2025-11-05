@@ -7,14 +7,12 @@ fun formatDate(year: Int, month: Int, day: Int): String {
     val monthStr = if (month < 10) "0$month" else "$month"
     val dayStr = if (day < 10) "0$day" else "$day"
     val result = "$year-$monthStr-$dayStr"
-    println("DEBUG: Форматированная дата: $result")
     return result
 }
 
-// Функция для форматирования времени (убираем секунды)
 fun formatTime(timeString: String): String {
     return if (timeString.length > 5) {
-        timeString.substring(0, 5) // Берем только "HH:MM"
+        timeString.substring(0, 5)
     } else {
         timeString
     }
@@ -24,9 +22,7 @@ fun generateNoteId(): Int {
     return Random.nextInt(1000, 9999)
 }
 
-// Конвертер для пользовательских заметок
 fun NoteData.toUserNote(): Note {
-    // Разделяем текст на заголовок и описание
     val lines = this.note.split('\n')
     val (header, body) = when {
         lines.size == 1 -> {
@@ -44,33 +40,41 @@ fun NoteData.toUserNote(): Note {
         id = generateNoteId(),
         date = this.date,
         place = this.location,
-        header = if (header.isNotEmpty()) header else null,
-        note = if (body.isNotEmpty()) body else null,
+        header = header.ifEmpty { null },
+        note = body.ifEmpty { null },
         is_notifications_enabled = this.isNotification,
         start_time = this.startTime,
         end_time = if (this.isInterval) this.endTime else null
     )
 }
 
-// Конвертер для расписания в NoteData
 fun org.ikbey.planner.dataBase.Schedule.toNoteData(): NoteData {
     val noteText = buildString {
         append(subject)
-        if (!type.isNullOrEmpty()) {
+        if (type.isNotEmpty()) {
             append(" ($type)")
         }
         if (!teacher.isNullOrEmpty()) {
             append("\nПреподаватель: $teacher")
         }
+    }
+
+    val location = buildString {
+        if (!place.isNullOrEmpty()) {
+            append(place)
+        }
         if (!audithory.isNullOrEmpty()) {
-            append("\nАудитория: $audithory")
+            if (!place.isNullOrEmpty()) {
+                append(", ")
+            }
+            append(audithory)
         }
     }
 
     return NoteData(
-        startTime = formatTime(start_time), // Форматируем время
-        endTime = formatTime(end_time),     // Форматируем время
-        location = audithory ?: "",
+        startTime = formatTime(start_time),
+        endTime = formatTime(end_time),
+        location = location,
         note = noteText,
         isInterval = true,
         isNotification = false,
@@ -79,33 +83,38 @@ fun org.ikbey.planner.dataBase.Schedule.toNoteData(): NoteData {
     )
 }
 
-// Конвертер для расписания в Note (для отображения)
 fun org.ikbey.planner.dataBase.Schedule.toNote(): Note {
     val noteText = buildString {
         if (!teacher.isNullOrEmpty()) {
             append("Преподаватель: $teacher")
         }
+    }
+
+    val location = buildString {
+        if (!place.isNullOrEmpty()) {
+            append(place)
+        }
         if (!audithory.isNullOrEmpty()) {
-            if (!teacher.isNullOrEmpty()) append("\n")
-            append("Аудитория: $audithory")
+            if (!place.isNullOrEmpty()) {
+                append(", ")
+            }
+            append(audithory)
         }
     }
 
     return Note(
         id = id,
         date = date,
-        place = audithory,
-        header = "$subject${if (!type.isNullOrEmpty()) " ($type)" else ""}",
-        note = if (noteText.isNotEmpty()) noteText else null,
+        place = location.ifEmpty { null },
+        header = "$subject${if (type.isNotEmpty()) " ($type)" else ""}",
+        note = noteText.ifEmpty { null },
         is_notifications_enabled = false,
         start_time = formatTime(start_time),
         end_time = formatTime(end_time),
-        is_done = is_done // Важно: передаем состояние выполнения
+        is_done = is_done
     )
 }
 
-
-// Конвертер для мероприятий в NoteData
 fun org.ikbey.planner.dataBase.CalendarEvent.toNoteData(): NoteData {
     val noteText = buildString {
         append(title)
@@ -115,14 +124,14 @@ fun org.ikbey.planner.dataBase.CalendarEvent.toNoteData(): NoteData {
         if (!location.isNullOrEmpty()) {
             append("\nМесто: $location")
         }
-        if (!creator.isNullOrEmpty()) {
+        if (creator.isNotEmpty()) {
             append("\nОрганизатор: $creator")
         }
     }
 
     return NoteData(
-        startTime = formatTime(start_time), // Форматируем время
-        endTime = formatTime(end_time),     // Форматируем время
+        startTime = formatTime(start_time),
+        endTime = formatTime(end_time),
         location = location ?: "",
         note = noteText,
         isInterval = true,
@@ -132,7 +141,6 @@ fun org.ikbey.planner.dataBase.CalendarEvent.toNoteData(): NoteData {
     )
 }
 
-// Конвертер для мероприятий в Note (для отображения)
 fun org.ikbey.planner.dataBase.CalendarEvent.toNote(): Note {
     val noteText = buildString {
         if (!description.isNullOrEmpty()) {
@@ -142,7 +150,7 @@ fun org.ikbey.planner.dataBase.CalendarEvent.toNote(): Note {
             if (!description.isNullOrEmpty()) append("\n")
             append("Место: $location")
         }
-        if (!creator.isNullOrEmpty()) {
+        if (creator.isNotEmpty()) {
             if (!description.isNullOrEmpty() || !location.isNullOrEmpty()) append("\n")
             append("Организатор: $creator")
         }
@@ -153,15 +161,14 @@ fun org.ikbey.planner.dataBase.CalendarEvent.toNote(): Note {
         date = date,
         place = location,
         header = title,
-        note = if (noteText.isNotEmpty()) noteText else null,
+        note = noteText.ifEmpty { null },
         is_notifications_enabled = false,
         start_time = formatTime(start_time),
         end_time = formatTime(end_time),
-        is_done = is_done // Важно: передаем состояние выполнения
+        is_done = is_done
     )
 }
 
-// Функция для преобразования пользовательской заметки в NoteData (для редактирования)
 fun Note.toNoteData(): NoteData {
     val fullText = buildString {
         if (!header.isNullOrEmpty()) append(header)
