@@ -73,7 +73,6 @@ import kotlinx.coroutines.launch
 import org.ikbey.planner.dataBase.*
 import org.ikbey.planner.notification.NotificationManager
 
-
 @Composable
 fun HomeScreen(
     notificationManager: NotificationManager,
@@ -97,9 +96,20 @@ fun HomeScreen(
     var showAddNoteSheet by remember { mutableStateOf(false) }
     var showNoteDetail by remember { mutableStateOf(false) }
     var selectedNote by remember { mutableStateOf<Note?>(null) }
+    var selectedNoteData by remember { mutableStateOf<NoteData?>(null) }
     var notes by remember { mutableStateOf<List<Note>>(emptyList()) }
+    var schedules by remember { mutableStateOf<List<Schedule>>(emptyList()) }
+    var calendarEvents by remember { mutableStateOf<List<CalendarEvent>>(emptyList()) }
     var isListChanged by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
+
+    LaunchedEffect(Unit) {
+        try {
+            localDb.deleteSetting("init_load")
+        } catch (e: Exception) {
+            println("ERROR: Failed to delete init_load setting: ${e.message}")
+        }
+    }
 
     LaunchedEffect(selectedYear, selectedMonth, selectedDay, isListChanged) {
         try {
@@ -114,19 +124,86 @@ fun HomeScreen(
         }
     }
 
-    val toggleNoteDone = { noteId: Int, isDone: Boolean ->
-        coroutineScope.launch {
-            try {
-                localDb.updateUserNoteIsDone(noteId, isDone)
-                isListChanged = !isListChanged // Обновляем список
-            } catch (e: Exception) {
-                println("ERROR: Ошибка при обновлении состояния заметки: ${e.message}")
+    LaunchedEffect(selectedYear, selectedMonth, selectedDay) {
+        try {
+            val date = formatDate(selectedYear, selectedMonth, selectedDay)
+            val loadedSchedules = localDb.getUserScheduleByDate(date)
+            schedules = loadedSchedules
+        } catch (e: Exception) {
+            println("ERROR: Ошибка загрузки расписания: ${e.message}")
+        }
+    }
+
+    LaunchedEffect(selectedYear, selectedMonth, selectedDay) {
+        try {
+            val date = formatDate(selectedYear, selectedMonth, selectedDay)
+            val loadedEvents = localDb.getTrackedCalendarEventsByDate(date)
+            calendarEvents = loadedEvents
+        } catch (e: Exception) {
+            println("ERROR: Ошибка загрузки мероприятий: ${e.message}")
+        }
+    }
+
+    val allItems = remember(notes, schedules, calendarEvents) {
+        val userNotes = notes.map { note ->
+            note.toNoteData() to note
+        }
+        val scheduleNotes = schedules.map { schedule ->
+            schedule.toNoteData() to schedule.toNote()
+        }
+        val eventNotes = calendarEvents.map { event ->
+            event.toNoteData() to event.toNote()
+        }
+        (userNotes + scheduleNotes + eventNotes).sortedBy { (noteData, _) ->
+            timeToMinutes(noteData.startTime)
+        }
+    }
+
+    val updateItemDoneState = { itemId: Int, isDone: Boolean, itemType: NoteType ->
+        when (itemType) {
+            NoteType.USER_NOTE -> {
+                notes = notes.map { note ->
+                    if (note.id == itemId) note.copy(is_done = isDone) else note
+                }
+            }
+            NoteType.SCHEDULE -> {
+                schedules = schedules.map { schedule ->
+                    if (schedule.id == itemId) schedule.copy(is_done = isDone) else schedule
+                }
+            }
+            NoteType.CALENDAR_EVENT -> {
+                calendarEvents = calendarEvents.map { event ->
+                    if (event.id == itemId) event.copy(is_done = isDone) else event
+                }
             }
         }
     }
 
-    val onToggleNoteDone: (Int, Boolean) -> Unit = { noteId, isDone ->
-        toggleNoteDone(noteId, isDone)
+    val toggleNoteDone = { noteId: Int, isDone: Boolean, noteType: NoteType ->
+        coroutineScope.launch {
+            try {
+                updateItemDoneState(noteId, isDone, noteType)
+
+                when (noteType) {
+                    NoteType.USER_NOTE -> {
+                        localDb.updateUserNoteIsDone(noteId, isDone)
+                    }
+                    NoteType.SCHEDULE -> {
+                        localDb.updateUserScheduleIsDone(noteId, isDone)
+                    }
+                    NoteType.CALENDAR_EVENT -> {
+                        localDb.updateCalendarEventIsDone(noteId, isDone)
+                    }
+                }
+            } catch (e: Exception) {
+                println("ERROR: Ошибка при обновлении состояния: ${e.message}")
+                updateItemDoneState(noteId, !isDone, noteType)
+            }
+        }
+    }
+
+    val onToggleNoteDone: (Int, Boolean, NoteType) -> Unit = { noteId, isDone, noteType ->
+        toggleNoteDone(noteId, isDone, noteType)
     }
 
     val bottomSheetOffset by animateDpAsState(
@@ -143,28 +220,28 @@ fun HomeScreen(
             .fillMaxSize()
             .background(Yellow)
             .pointerInput(Unit) {
-            detectHorizontalDragGestures(
-                onDragStart = { change ->
-                    val start = change.x
-                    val screenWidth = size.width
-                    isLeftSwipeActive = start < screenWidth * 0.40f
-                    isRightSwipeActive = start > screenWidth * 0.60f
-                },
-                onHorizontalDrag = {change, dragAmount ->
-                    if (isLeftSwipeActive && dragAmount > 50f){
-                        onSwipeToMonth()
-                    }
-                    if (isRightSwipeActive && dragAmount < -50f){
-                        onSwipeToEvents()
-                    }
-                },
+                detectHorizontalDragGestures(
+                    onDragStart = { change ->
+                        val start = change.x
+                        val screenWidth = size.width
+                        isLeftSwipeActive = start < screenWidth * 0.40f
+                        isRightSwipeActive = start > screenWidth * 0.60f
+                    },
+                    onHorizontalDrag = {change, dragAmount ->
+                        if (isLeftSwipeActive && dragAmount > 50f){
+                            onSwipeToMonth()
+                        }
+                        if (isRightSwipeActive && dragAmount < -50f){
+                            onSwipeToEvents()
+                        }
+                    },
 
-                onDragEnd = {
-                    isLeftSwipeActive = false
-                    isRightSwipeActive = false
-                }
-            )
-        }
+                    onDragEnd = {
+                        isLeftSwipeActive = false
+                        isRightSwipeActive = false
+                    }
+                )
+            }
     ) {
         if (isLeftSwipeActive) {
             Box(
@@ -266,10 +343,11 @@ fun HomeScreen(
                     .weight(1f)
             ) {
                 NotesSection(
-                    notes = notes,
+                    items = allItems,
                     scrollState = scrollState,
-                    onNoteClick = { note ->
+                    onNoteClick = { noteData, note ->
                         selectedNote = note
+                        selectedNoteData = noteData
                         showNoteDetail = true
                     },
                     onToggleNoteDone = onToggleNoteDone,
@@ -344,7 +422,7 @@ fun HomeScreen(
                                 localDb.insertUserNote(note)
                                 isListChanged = !isListChanged
 
-                                // ДОБАВЬТЕ ЭТО - планируем уведомление если включено
+                                // Уведомления для пользовательских заметок
                                 if (note.is_notifications_enabled == true) {
                                     println("🔔 [DEBUG] Вызываем scheduleNotification для заметки ${note.id}")
                                     notificationManager.scheduleNotification(note)
@@ -363,37 +441,58 @@ fun HomeScreen(
         }
     }
 
-    if (showNoteDetail && selectedNote != null) {
+    if (showNoteDetail && selectedNote != null && selectedNoteData != null) {
         NoteDetailDialog(
-            notificationManager = notificationManager, // ПЕРЕДАЙТЕ notificationManager
+            notificationManager = notificationManager, // Передаем менеджер уведомлений
             note = selectedNote!!,
+            noteData = selectedNoteData!!,
             onDismiss = {
                 showNoteDetail = false
                 selectedNote = null
+                selectedNoteData = null
             },
             onDelete = {
-                coroutineScope.launch {
-                    try {
-                        // ОТМЕНЯЕМ уведомление при удалении
-                        notificationManager.cancelNotification(selectedNote!!.id)
-                        localDb.deleteUserNote(selectedNote!!.id)
-                        isListChanged = !isListChanged
-                        showNoteDetail = false
-                        selectedNote = null
-                    } catch (e: Exception) {
-                        println("ERROR: Ошибка при удалении заметки: ${e.message}")
+                if (selectedNoteData?.type == NoteType.USER_NOTE) {
+                    coroutineScope.launch {
+                        try {
+                            // Отменяем уведомление при удалении
+                            notificationManager.cancelNotification(selectedNote!!.id)
+                            localDb.deleteUserNote(selectedNote!!.id)
+                            isListChanged = !isListChanged
+                            showNoteDetail = false
+                            selectedNote = null
+                            selectedNoteData = null
+                        } catch (e: Exception) {
+                            println("ERROR: Ошибка при удалении заметки: ${e.message}")
+                        }
                     }
+                } else {
+                    showNoteDetail = false
+                    selectedNote = null
+                    selectedNoteData = null
                 }
             },
             onUpdate = { updatedNote ->
-                coroutineScope.launch {
-                    try {
-                        localDb.insertUserNote(updatedNote)
-                        isListChanged = !isListChanged
+                if (selectedNoteData?.type == NoteType.USER_NOTE) {
+                    coroutineScope.launch {
+                        try {
+                            localDb.insertUserNote(updatedNote)
+                            isListChanged = !isListChanged
 
-                        // Уведомление обрабатывается в NoteDetailDialog
-                    } catch (e: Exception) {
-                        println("ERROR: Ошибка при обновлении заметки: ${e.message}")
+                            // Обновляем уведомления
+                            println("🔔 [DEBUG] Обновляем заметку ${updatedNote.id}")
+                            println("🔔 [DEBUG] Уведомление включено: ${updatedNote.is_notifications_enabled}")
+
+                            if (updatedNote.is_notifications_enabled == true) {
+                                println("🔔 [DEBUG] Вызываем scheduleNotification для обновленной заметки ${updatedNote.id}")
+                                notificationManager.scheduleNotification(updatedNote)
+                            } else {
+                                println("🔔 [DEBUG] Отменяем уведомление для заметки ${updatedNote.id}")
+                                notificationManager.cancelNotification(updatedNote.id)
+                            }
+                        } catch (e: Exception) {
+                            println("ERROR: Ошибка при обновлении заметки: ${e.message}")
+                        }
                     }
                 }
             }
@@ -403,10 +502,10 @@ fun HomeScreen(
 
 @Composable
 fun NotesSection(
-    notes: List<Note>,
+    items: List<Pair<NoteData, Note>>,
     scrollState: ScrollState,
-    onNoteClick: (Note) -> Unit,
-    onToggleNoteDone: (Int, Boolean) -> Unit,
+    onNoteClick: (NoteData, Note) -> Unit,
+    onToggleNoteDone: (Int, Boolean, NoteType) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -414,13 +513,14 @@ fun NotesSection(
             .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        if (notes.isNotEmpty()) {
-            notes.forEach { note ->
+        if (items.isNotEmpty()) {
+            items.forEach { (noteData, note) ->
                 NoteCard(
                     note = note,
-                    onNoteClick = { onNoteClick(note) },
+                    noteData = noteData,
+                    onNoteClick = { onNoteClick(noteData, note) },
                     onToggleDone = { isDone ->
-                        onToggleNoteDone(note.id, isDone)
+                        onToggleNoteDone(note.id, isDone, noteData.type)
                     }
                 )
             }
@@ -446,10 +546,10 @@ fun NotesSection(
         Spacer(modifier = Modifier.height(40.dp))
     }
 }
-
 @Composable
 fun NoteCard(
     note: Note,
+    noteData: NoteData,
     onNoteClick: () -> Unit,
     onToggleDone: (Boolean) -> Unit
 ) {
@@ -605,7 +705,169 @@ private fun getHeaderAndBody(note: Note): Pair<String, String> {
 
 @Composable
 fun NoteDetailDialog(
-    notificationManager: NotificationManager, // ДОБАВЬТЕ ЭТОТ ПАРАМЕТР
+    notificationManager: NotificationManager,
+    note: Note,
+    noteData: NoteData,
+    onDismiss: () -> Unit,
+    onDelete: () -> Unit,
+    onUpdate: (Note) -> Unit
+) {
+    val isEditable = noteData.type == NoteType.USER_NOTE
+
+    if (!isEditable) {
+        ReadOnlyNoteDetailDialog(
+            note = note,
+            noteData = noteData,
+            onDismiss = onDismiss
+        )
+    } else {
+        EditableNoteDetailDialog(
+            notificationManager = notificationManager,
+            note = note,
+            onDismiss = onDismiss,
+            onDelete = onDelete,
+            onUpdate = onUpdate
+        )
+    }
+}
+
+@Composable
+fun ReadOnlyNoteDetailDialog(
+    note: Note,
+    noteData: NoteData,
+    onDismiss: () -> Unit
+) {
+    val scrollState = rememberScrollState()
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(400.dp)
+                .background(
+                    color = LightGreen,
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(vertical = 20.dp, horizontal = 16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = when (noteData.type) {
+                        NoteType.SCHEDULE -> "Расписание"
+                        NoteType.CALENDAR_EVENT -> "Мероприятие"
+                        else -> "Заметка"
+                    },
+                    fontFamily = getInterFont(InterFontType.REGULAR),
+                    fontSize = 24.sp,
+                    color = Black
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Время:",
+                    fontFamily = getInterFont(InterFontType.REGULAR),
+                    fontSize = 20.sp,
+                    color = DarkGreen
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = if (noteData.isInterval) {
+                        "${noteData.startTime} - ${noteData.endTime}"
+                    } else {
+                        noteData.startTime
+                    },
+                    fontFamily = getInterFont(InterFontType.SEMI_BOLD),
+                    fontSize = 20.sp,
+                    color = Black
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (noteData.location.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Место:",
+                        fontFamily = getInterFont(InterFontType.REGULAR),
+                        fontSize = 20.sp,
+                        color = DarkGreen
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Text(
+                        text = noteData.location,
+                        fontFamily = getInterFont(InterFontType.SEMI_BOLD),
+                        fontSize = 20.sp,
+                        color = Black
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .background(
+                        color = Color.White,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .verticalScroll(scrollState)
+                    .padding(12.dp)
+            ) {
+                val (header, body) = getHeaderAndBody(note)
+
+                if (header.isNotEmpty()) {
+                    Text(
+                        text = header,
+                        fontFamily = getInterFont(InterFontType.SEMI_BOLD),
+                        fontSize = 20.sp,
+                        color = Black,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    if (body.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+
+                if (body.isNotEmpty()) {
+                    Text(
+                        text = body,
+                        fontFamily = getInterFont(InterFontType.REGULAR),
+                        fontSize = 20.sp,
+                        color = Black,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EditableNoteDetailDialog(
+    notificationManager: NotificationManager,
     note: Note,
     onDismiss: () -> Unit,
     onDelete: () -> Unit,
@@ -632,11 +894,14 @@ fun NoteDetailDialog(
 
     val originalNote = remember { note }
 
+    var intervalError by remember { mutableStateOf(false) }
+
     val canSaveChanges = remember(startTime, endTime, noteText, isInterval) {
         val isStartTimeValid = isValidTime(startTime)
         val isEndTimeValid = if (isInterval) isValidTime(endTime) else true
+        val isIntervalValid = if (isInterval) isValidTimeInterval(startTime, endTime) else true
 
-        isStartTimeValid && isEndTimeValid && noteText.isNotBlank()
+        isStartTimeValid && isEndTimeValid && isIntervalValid && noteText.isNotBlank()
     }
 
     val saveChangesIfValid = {
@@ -645,12 +910,14 @@ fun NoteDetailDialog(
         } else {
             !isValidTime(startTime)
         }
+        val hasIntervalError = isInterval && !isValidTimeInterval(startTime, endTime)
         val hasNoteError = noteText.isBlank()
 
         timeError = hasTimeError
+        intervalError = hasIntervalError
         noteError = hasNoteError
 
-        if (!hasTimeError && !hasNoteError) {
+        if (!hasTimeError && !hasIntervalError && !hasNoteError) {
             coroutineScope.launch {
                 val updatedNote = createUpdatedNote(originalNote, startTime, endTime, location, noteText, isInterval, isNotification)
 
@@ -659,7 +926,7 @@ fun NoteDetailDialog(
 
                 onUpdate(updatedNote)
 
-                // ДОБАВЬТЕ ЭТО - обновляем уведомление
+                // Обновляем уведомления
                 if (updatedNote.is_notifications_enabled == true) {
                     println("🔔 [DEBUG] Вызываем scheduleNotification для обновленной заметки ${updatedNote.id}")
                     notificationManager.scheduleNotification(updatedNote)
@@ -711,18 +978,24 @@ fun NoteDetailDialog(
                     onStartTimeChange = {
                         startTime = it
                         timeError = !isValidTime(it) || (isInterval && !isValidTime(endTime))
+                        intervalError = isInterval && !isValidTimeInterval(startTime, endTime)
                     },
                     onEndTimeChange = {
                         endTime = it
                         timeError = !isValidTime(startTime) || (isInterval && !isValidTime(it))
+                        intervalError = isInterval && !isValidTimeInterval(startTime, endTime)
                     },
                     modifier = Modifier.weight(1f)
                 )
             }
 
-            if (timeError) {
+            if (timeError || intervalError) {
                 Text(
-                    text = if (isInterval) "Укажите время полностью" else "Укажите время полностью",
+                    text = when {
+                        intervalError -> "Некорректный интервал"
+                        timeError && isInterval -> "Укажите время полностью"
+                        else -> "Укажите время полностью"
+                    },
                     color = DarkGreen,
                     fontSize = 14.sp,
                     modifier = Modifier
@@ -756,8 +1029,10 @@ fun NoteDetailDialog(
                         isInterval = it
                         if (it) {
                             timeError = !isValidTime(startTime) || !isValidTime(endTime)
+                            intervalError = !isValidTimeInterval(startTime, endTime)
                         } else {
                             timeError = !isValidTime(startTime)
+                            intervalError = false
                         }
                     },
                     colors = SwitchDefaults.colors(
@@ -828,6 +1103,7 @@ fun NoteDetailDialog(
                     .height(250.dp)
             )
 
+
             Spacer(modifier = Modifier.height(20.dp))
 
             Row(
@@ -862,7 +1138,7 @@ fun NoteDetailDialog(
                 Box(
                     modifier = Modifier
                         .size(48.dp)
-                        .clip(CircleShape) // ← Обрезаем по кругу
+                        .clip(CircleShape)
                         .clickable { onDelete() }
                         .background(Color.Transparent),
                     contentAlignment = Alignment.Center
@@ -879,6 +1155,26 @@ fun NoteDetailDialog(
     }
 }
 
+fun isValidTimeInterval(startTime: String, endTime: String): Boolean {
+    if (!isValidTime(startTime) || !isValidTime(endTime)) return false
+
+    val startMinutes = timeToMinutes(startTime)
+    val endMinutes = timeToMinutes(endTime)
+
+    return endMinutes > startMinutes
+}
+
+private fun timeToMinutes(time: String?): Int {
+    if (time.isNullOrEmpty() || time.length != 5 || time[2] != ':') return Int.MAX_VALUE
+
+    return try {
+        val (hours, minutes) = time.split(":").map { it.toInt() }
+        hours * 60 + minutes
+    } catch (e: Exception) {
+        println("ERROR: Invalid time format: $time, error: ${e.message}")
+        Int.MAX_VALUE
+    }
+}
 private fun createUpdatedNote(
     originalNote: Note,
     startTime: String,
@@ -912,16 +1208,6 @@ private fun createUpdatedNote(
     )
 }
 
-private fun timeToMinutes(time: String): Int {
-    if (time.isEmpty() || time.length != 5 || time[2] != ':') return Int.MAX_VALUE
-
-    return try {
-        val (hours, minutes) = time.split(":").map { it.toInt() }
-        hours * 60 + minutes
-    } catch (e: Exception) {
-        Int.MAX_VALUE
-    }
-}
 
 private fun compareNotesAdvanced(note1: Note, note2: Note): Int {
     val time1 = note1.start_time ?: ""
