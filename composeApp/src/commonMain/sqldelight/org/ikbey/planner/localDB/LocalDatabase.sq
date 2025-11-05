@@ -35,6 +35,7 @@ CREATE TABLE user_schedule (
     end_time TEXT NOT NULL,
     teacher TEXT,
     audithory TEXT,
+    place TEXT,
     is_done INTEGER NOT NULL DEFAULT 0
 );
 
@@ -147,8 +148,8 @@ UPDATE user_schedule SET is_done = ? WHERE id = ?;
 
 insertUserSchedule:
 INSERT OR REPLACE INTO user_schedule
-(id, group_id, date, weekday, subject, type, start_time, end_time, teacher, audithory, is_done)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+(id, group_id, date, weekday, subject, type, start_time, end_time, teacher, audithory, place, is_done)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 deleteUserSchedule:
 DELETE FROM user_schedule;

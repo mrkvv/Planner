@@ -249,8 +249,8 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     end_time = schedule.end_time,
                     teacher = schedule.teacher,
                     audithory = schedule.audithory,
+                    place = schedule.place,
                     is_done = schedule.is_done.toInt() == 1
-
                 )
             }
         }
@@ -270,6 +270,7 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     end_time = schedule.end_time,
                     teacher = schedule.teacher,
                     audithory = schedule.audithory,
+                    place = schedule.place,
                     is_done = schedule.is_done.toInt() == 1
                 )
             }
@@ -290,6 +291,7 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                     end_time = schedule.end_time,
                     teacher = schedule.teacher,
                     audithory = schedule.audithory,
+                    place = schedule.place,
                     is_done = schedule.is_done.toInt() == 1
                 )
             }
@@ -318,6 +320,7 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
                 end_time = schedule.end_time,
                 teacher = schedule.teacher,
                 audithory = schedule.audithory,
+                place = schedule.place,
                 is_done = if (schedule.is_done) 1 else 0
             )
         }
