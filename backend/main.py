@@ -1,3 +1,5 @@
+import random
+
 import psycopg2
 from datetime import datetime, timedelta
 from typing import List
@@ -15,7 +17,7 @@ class DatabaseManager:
             'host': 'aws-1-eu-north-1.pooler.supabase.com',
             'port': 5432,
             'database': 'postgres',
-            'user': '*',
+            'user': 'postgres.pjcbyabqlgpjvkozojvc',
             'password': '*',
         }
         self.connection = None
@@ -65,13 +67,40 @@ class DatabaseManager:
             finally:
                 self.connection = None
 
+    def add_place_column_to_schedule(self):
+        """Добавляет поле place в таблицу schedule, если его нет"""
+        if not self.ensure_connection():
+            print("Не удалось подключиться для добавления поля place")
+            return False
+
+        try:
+            with self.connection.cursor() as cursor:
+                # Проверяем, существует ли уже поле place
+                cursor.execute("""
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = 'schedule' AND column_name = 'place'
+                """)
+                if not cursor.fetchone():
+                    # Добавляем поле place
+                    cursor.execute("ALTER TABLE schedule ADD COLUMN place VARCHAR(100)")
+                    self.connection.commit()
+                    print("Поле place успешно добавлено в таблицу schedule")
+                else:
+                    print("Поле place уже существует в таблице schedule")
+                return True
+        except Exception as e:
+            print(f"Ошибка добавления поля place: {e}")
+            self.connection.rollback()
+            return False
+
     def check_calendar_event_exists(self, event: CalendarEvent) -> bool:
         """Проверяет, существует ли уже такое событие в календаре"""
         if not self.ensure_connection():
             return False
 
         check_sql = """
-        SELECT COUNT(*) FROM calendar_events 
+        SELECT COUNT(*) FROM calendar_events
         WHERE title = %s AND date = %s AND start_time = %s AND end_time = %s AND calendar_name = %s
         """
 
@@ -99,160 +128,153 @@ class DatabaseManager:
             print("Нет событий для вставки в календарь")
             return
 
-        insert_sql = """
-        INSERT INTO calendar_events 
+        # Используем UPSERT для обновления существующих записей
+        upsert_sql = """
+        INSERT INTO calendar_events
         (title, description, date, start_time, end_time, location, creator, calendar_name)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (title, date, start_time, end_time, calendar_name)
+        DO UPDATE SET
+            description = EXCLUDED.description,
+            location = EXCLUDED.location,
+            creator = EXCLUDED.creator
         """
 
         try:
             with self.connection.cursor() as cursor:
-                new_events_count = 0
-                duplicate_events_count = 0
+                inserted_count = 0
+                updated_count = 0
 
                 for event in events:
                     # Проверяем, существует ли уже такое событие
-                    if not self.check_calendar_event_exists(event):
-                        try:
-                            cursor.execute(insert_sql, (
-                                event.title,
-                                event.description,
-                                event.date,
-                                event.start_time,
-                                event.end_time,
-                                event.location,
-                                event.creator,
-                                event.calendar_name
-                            ))
-                            new_events_count += 1
-                        except psycopg2.IntegrityError:
-                            # Если все же возникла ошибка уникальности (на случай race condition)
-                            duplicate_events_count += 1
-                            self.connection.rollback()
-                            continue
+                    cursor.execute("""
+                        SELECT COUNT(*) FROM calendar_events
+                        WHERE title = %s AND date = %s AND start_time = %s AND end_time = %s AND calendar_name = %s
+                    """, (
+                        event.title,
+                        event.date,
+                        event.start_time,
+                        event.end_time,
+                        event.calendar_name
+                    ))
+                    exists = cursor.fetchone()[0] > 0
+
+                    cursor.execute(upsert_sql, (
+                        event.title,
+                        event.description,
+                        event.date,
+                        event.start_time,
+                        event.end_time,
+                        event.location,
+                        event.creator,
+                        event.calendar_name
+                    ))
+
+                    if exists:
+                        updated_count += 1
                     else:
-                        duplicate_events_count += 1
+                        inserted_count += 1
 
                 self.connection.commit()
-                print(
-                    f"Календарь: добавлено {new_events_count} новых событий, пропущено {duplicate_events_count} дубликатов")
+                print(f"Календарь: добавлено {inserted_count} новых событий, обновлено {updated_count} существующих")
 
         except Exception as e:
             print(f"Ошибка вставки событий календаря: {e}")
             self.connection.rollback()
 
-    def check_schedule_lesson_exists(self, group_id: int, date: str, start_time: str,
-                                     end_time: str, subject: str) -> bool:
-        """Проверяет, существует ли уже такое занятие в расписании"""
-        if not self.ensure_connection():
-            return False
-
-        check_sql = """
-        SELECT COUNT(*) FROM schedule 
-        WHERE group_id = %s AND date = %s AND start_time = %s AND end_time = %s AND subject = %s
-        """
-
-        try:
-            with self.connection.cursor() as cursor:
-                cursor.execute(check_sql, (
-                    group_id,
-                    date,
-                    start_time,
-                    end_time,
-                    subject
-                ))
-                count = cursor.fetchone()[0]
-                return count > 0
-        except Exception as e:
-            print(f"Ошибка проверки занятия расписания: {e}")
-            return False
-
     def insert_semester_schedule(self, semester_schedule: SemesterSchedule, group_id: int):
         """
-        Вставляет расписание на весь семестр в базу данных с проверкой дубликатов
+        Вставляет или обновляет расписание на весь семестр в базу данных
         """
         if not self.ensure_connection():
-            print(f"Не удалось подключиться к БД для группы {group_id}")
+            print(f"❌ Не удалось подключиться к БД для группы {group_id}")
             return 0
 
         if not semester_schedule.weeks:
-            print(f"Для группы {group_id} нет данных за семестр")
+            print(f"⚠️ Для группы {group_id} нет данных за семестр")
             return 0
 
-        insert_sql = """
-        INSERT INTO schedule 
-        (group_id, date, weekday, subject, type, start_time, end_time, teacher, audithory)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        upsert_sql = """
+        INSERT INTO schedule
+        (group_id, date, weekday, subject, type, start_time, end_time, teacher, audithory, place)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (group_id, date, start_time, end_time, subject)
+        DO UPDATE SET
+            weekday = EXCLUDED.weekday,
+            type = EXCLUDED.type,
+            teacher = EXCLUDED.teacher,
+            audithory = EXCLUDED.audithory,
+            place = EXCLUDED.place
         """
 
         for attempt in range(self.max_retries):
             try:
                 with self.connection.cursor() as cursor:
-                    total_lessons = 0
-                    new_lessons_count = 0
-                    duplicate_lessons_count = 0
-
-                    # Вставляем пакетами по 50 занятий для уменьшения нагрузки
-                    batch_size = 50
+                    inserted_count = 0
+                    updated_count = 0
                     batch_count = 0
 
                     for week in semester_schedule.weeks:
                         for day in week.days:
                             for lesson in day.lessons:
-                                # Проверяем, существует ли уже такое занятие
-                                if not self.check_schedule_lesson_exists(
-                                        group_id, day.date, lesson.time_start,
-                                        lesson.time_end, lesson.subject
-                                ):
-                                    try:
-                                        cursor.execute(insert_sql, (
-                                            group_id,
-                                            day.date,
-                                            day.weekday,
-                                            lesson.subject,
-                                            lesson.type,
-                                            lesson.time_start,
-                                            lesson.time_end,
-                                            lesson.teacher,
-                                            lesson.auditory
-                                        ))
-                                        new_lessons_count += 1
-                                    except psycopg2.IntegrityError:
-                                        # Если все же возникла ошибка уникальности
-                                        duplicate_lessons_count += 1
-                                        self.connection.rollback()
-                                        continue
-                                else:
-                                    duplicate_lessons_count += 1
+                                building = getattr(lesson, 'building', '') or ''
 
-                                total_lessons += 1
+                                # Проверяем, существует ли уже такое занятие
+                                cursor.execute("""
+                                    SELECT COUNT(*) FROM schedule
+                                    WHERE group_id = %s AND date = %s AND start_time = %s AND end_time = %s AND subject = %s
+                                """, (
+                                    group_id,
+                                    day.date,
+                                    lesson.time_start,
+                                    lesson.time_end,
+                                    lesson.subject
+                                ))
+                                exists = cursor.fetchone()[0] > 0
+
+                                # Выполняем UPSERT
+                                cursor.execute(upsert_sql, (
+                                    group_id,
+                                    day.date,
+                                    day.weekday,
+                                    lesson.subject,
+                                    lesson.type,
+                                    lesson.time_start,
+                                    lesson.time_end,
+                                    lesson.teacher,
+                                    lesson.auditory,
+                                    building
+                                ))
+
+                                if exists:
+                                    updated_count += 1
+                                else:
+                                    inserted_count += 1
+
                                 batch_count += 1
 
-                                # Коммитим каждые batch_size записей
-                                if batch_count >= batch_size:
+                                # Коммитим каждые 50 записей
+                                if batch_count >= 50:
                                     self.connection.commit()
                                     batch_count = 0
-                                    # Проверяем соединение после коммита
                                     if not self.ensure_connection():
-                                        return new_lessons_count
+                                        return inserted_count + updated_count
 
                     # Финальный коммит
                     self.connection.commit()
-                    print(f"Группа {group_id}: {new_lessons_count} новых занятий, "
-                          f"{duplicate_lessons_count} дубликатов за {len(semester_schedule.weeks)} недель")
-                    return new_lessons_count
+                    return inserted_count + updated_count
 
             except (OperationalError, InterfaceError) as e:
-                print(f"Попытка {attempt + 1}/{self.max_retries} для группы {group_id} не удалась: {e}")
+                print(f"🔄 Попытка {attempt + 1}/{self.max_retries} для группы {group_id} не удалась: {e}")
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
                     if not self.ensure_connection():
                         continue
                 else:
-                    print(f"Все попытки для группы {group_id} не удались")
+                    print(f"💥 Все попытки для группы {group_id} не удались")
                     return 0
             except Exception as e:
-                print(f"Неожиданная ошибка для группы {group_id}: {e}")
+                print(f"💥 Неожиданная ошибка для группы {group_id}: {e}")
                 self.connection.rollback()
                 return 0
 
@@ -268,14 +290,14 @@ class DatabaseManager:
             with self.connection.cursor() as cursor:
                 # Создаем уникальное ограничение для calendar_events
                 cursor.execute("""
-                    DO $$ 
-                    BEGIN 
+                    DO $$
+                    BEGIN
                         IF NOT EXISTS (
-                            SELECT 1 FROM pg_constraint 
+                            SELECT 1 FROM pg_constraint
                             WHERE conname = 'unique_calendar_event'
                         ) THEN
-                            ALTER TABLE calendar_events 
-                            ADD CONSTRAINT unique_calendar_event 
+                            ALTER TABLE calendar_events
+                            ADD CONSTRAINT unique_calendar_event
                             UNIQUE (title, date, start_time, end_time, calendar_name);
                         END IF;
                     END $$;
@@ -283,14 +305,14 @@ class DatabaseManager:
 
                 # Создаем уникальное ограничение для schedule
                 cursor.execute("""
-                    DO $$ 
-                    BEGIN 
+                    DO $$
+                    BEGIN
                         IF NOT EXISTS (
-                            SELECT 1 FROM pg_constraint 
+                            SELECT 1 FROM pg_constraint
                             WHERE conname = 'unique_schedule_lesson'
                         ) THEN
-                            ALTER TABLE schedule 
-                            ADD CONSTRAINT unique_schedule_lesson 
+                            ALTER TABLE schedule
+                            ADD CONSTRAINT unique_schedule_lesson
                             UNIQUE (group_id, date, start_time, end_time, subject);
                         END IF;
                     END $$;
@@ -306,21 +328,21 @@ class DatabaseManager:
             return False
 
     def cleanup_duplicate_schedule_entries(self):
-        """Очищает дубликаты в таблице расписания"""
+        """Очищает дубликаты в таблице расписания (на всякий случай)"""
         if not self.ensure_connection():
             print("Не удалось подключиться для очистки дубликатов")
             return
 
         cleanup_sql = """
-        DELETE FROM schedule 
+        DELETE FROM schedule
         WHERE id IN (
             SELECT id FROM (
                 SELECT id, ROW_NUMBER() OVER (
-                    PARTITION BY group_id, date, start_time, end_time, subject 
+                    PARTITION BY group_id, date, start_time, end_time, subject
                     ORDER BY id
                 ) as rn
                 FROM schedule
-            ) t 
+            ) t
             WHERE t.rn > 1
         )
         """
@@ -346,21 +368,21 @@ class DatabaseManager:
             self.connection.rollback()
 
     def cleanup_duplicate_calendar_events(self):
-        """Очищает дубликаты в таблице событий календаря"""
+        """Очищает дубликаты в таблице событий календаря (на всякий случай)"""
         if not self.ensure_connection():
             print("Не удалось подключиться для очистки дубликатов календаря")
             return
 
         cleanup_sql = """
-        DELETE FROM calendar_events 
+        DELETE FROM calendar_events
         WHERE id IN (
             SELECT id FROM (
                 SELECT id, ROW_NUMBER() OVER (
-                    PARTITION BY title, date, start_time, end_time, calendar_name 
+                    PARTITION BY title, date, start_time, end_time, calendar_name
                     ORDER BY id
                 ) as rn
                 FROM calendar_events
-            ) t 
+            ) t
             WHERE t.rn > 1
         )
         """
@@ -393,7 +415,7 @@ class DatabaseManager:
         try:
             faculties = scheduler_parser.get_faculties()
             faculty_sql = """
-            INSERT INTO faculties (id, name, abbr) 
+            INSERT INTO faculties (id, name, abbr)
             VALUES (%s, %s, %s)
             ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, abbr = EXCLUDED.abbr
             """
@@ -403,7 +425,7 @@ class DatabaseManager:
                     cursor.execute(faculty_sql, (faculty.id, faculty.name, faculty.abbr))
 
                 group_sql = """
-                INSERT INTO groups (id, name, faculty_id) 
+                INSERT INTO groups (id, name, faculty_id)
                 VALUES (%s, %s, %s)
                 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, faculty_id = EXCLUDED.faculty_id
                 """
@@ -458,7 +480,7 @@ class DatabaseManager:
                 for table in tables:
                     cursor.execute("""
                         SELECT EXISTS (
-                            SELECT FROM information_schema.tables 
+                            SELECT FROM information_schema.tables
                             WHERE table_name = %s
                         )
                     """, (table,))
@@ -507,9 +529,8 @@ def verify_connection():
 
 
 def get_all_groups_semester_schedule(scheduler_parser: SchedulerParser, db_manager: DatabaseManager,
-                                     max_groups: int = None, delay: float = 2.0):
-
-    print("Получаем расписание на ВЕСЬ СЕМЕСТР для всех групп...")
+                                     max_groups: int = None, delay: float = 5.0):
+    print("Получаем расписание с ТЕКУЩЕЙ ДАТЫ для всех групп...")
 
     all_group_ids = db_manager.get_all_group_ids()
 
@@ -527,23 +548,16 @@ def get_all_groups_semester_schedule(scheduler_parser: SchedulerParser, db_manag
     failed_groups = 0
     total_weeks = 0
 
-    current_month = datetime.now().month
-    if current_month >= 2 and current_month <= 7:
-        semester_start = f"{datetime.now().year}-02-07"
-    else:
-        semester_start = f"{datetime.now().year}-09-01"
-
-    print(f"Начало семестра: {semester_start}")
+    # Используем текущую дату
+    current_date = datetime.now().strftime('%Y-%m-%d')
 
     for i, group_id in enumerate(all_group_ids, 1):
         try:
-            print(f"\nОбрабатываем группу {i}/{len(all_group_ids)} (ID: {group_id})")
-
-            # Получаем расписание на весь семестр
+            # Получаем расписание с ТЕКУЩЕЙ ДАТЫ
             semester_schedule = scheduler_parser.get_semester_schedule(
                 group_id=group_id,
-                start_date=semester_start,
-                max_weeks=30
+                start_date=current_date,
+                max_weeks=6
             )
 
             if semester_schedule.weeks:
@@ -553,30 +567,33 @@ def get_all_groups_semester_schedule(scheduler_parser: SchedulerParser, db_manag
                     successful_groups += 1
                     total_lessons += lessons_count
                     total_weeks += len(semester_schedule.weeks)
-                    print(f"✓ Группа {group_id}: {lessons_count} занятий за {len(semester_schedule.weeks)} недель")
+
+                    # Подсчитываем общее количество занятий
+                    total_semester_lessons = sum(
+                        len(day.lessons) for week in semester_schedule.weeks for day in week.days)
+
+                    print(f"✅ Группа {i}/{len(all_group_ids)} (ID: {group_id}): {lessons_count} занятий за {len(semester_schedule.weeks)} недель")
                 else:
-                    print(f"○ Группа {group_id}: нет новых занятий в семестре")
+                    print(f"○ Группа {i}/{len(all_group_ids)} (ID: {group_id}): нет новых занятий")
             else:
-                print(f"○ Группа {group_id}: нет данных за семестр")
+                print(f"○ Группа {i}/{len(all_group_ids)} (ID: {group_id}): нет данных")
 
         except Exception as e:
             failed_groups += 1
-            print(f"✗ Группа {group_id}: ошибка - {e}")
+            print(f"❌ Группа {i}/{len(all_group_ids)} (ID: {group_id}): ошибка - {e}")
 
         if i < len(all_group_ids):
-            print(f"Ожидание {delay} секунд...")
-            time.sleep(delay)
+            current_delay = random.uniform(3.0, 5.0)
+            time.sleep(current_delay)
 
-        if i % 50 == 0:
-            print("Периодическая проверка соединения с БД...")
+        if i % 20 == 0:
             db_manager.ensure_connection()
 
-    print(f"\nСТАТИСТИКА ПО ГРУППАМ (ВЕСЬ СЕМЕСТР):")
-    print(f"   • Успешно обработано: {successful_groups} групп")
-    print(f"   • С ошибками: {failed_groups} групп")
-    print(f"   • Всего недель расписания: {total_weeks}")
-    print(f"   • Всего новых занятий за семестр: {total_lessons}")
-
+    print(f"\n🎯 ФИНАЛЬНАЯ СТАТИСТИКА:")
+    print(f"   ✅ Успешно обработано: {successful_groups} групп")
+    print(f"   ❌ С ошибками: {failed_groups} групп")
+    print(f"   📅 Всего недель расписания: {total_weeks}")
+    print(f"   📚 Всего занятий записано в БД: {total_lessons}")
 
 def main():
     calendar_parser = GoogleCalendarParser()
@@ -595,6 +612,11 @@ def main():
 
         print("НАЧИНАЕМ СБОР ДАННЫХ В SUPABASE...")
         print("=" * 50)
+
+        # ДОБАВЛЯЕМ ПОЛЕ place В ТАБЛИЦУ schedule
+        print("Добавляем поле place в таблицу schedule...")
+        if not db_manager.add_place_column_to_schedule():
+            print("Не удалось добавить поле place. Продолжаем без него...")
 
         print("Создание уникальных ограничений для предотвращения дубликатов...")
         db_manager.create_unique_constraints()
@@ -631,7 +653,7 @@ def main():
         all_groups = db_manager.insert_faculties_and_groups(scheduler_parser)
 
         if all_groups:
-            get_all_groups_semester_schedule(scheduler_parser, db_manager, max_groups=100)  # Ограничим для теста
+            get_all_groups_semester_schedule(scheduler_parser, db_manager)
 
         print("\nВСЕ ДАННЫЕ УСПЕШНО ЗАГРУЖЕНЫ В SUPABASE!")
 
@@ -667,5 +689,4 @@ def main():
 
 if __name__ == "__main__":
     verify_connection()
-
     main()

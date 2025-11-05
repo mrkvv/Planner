@@ -139,5 +139,4 @@ class GoogleCalendarParser:
             time.sleep(0.1)
 
         all_events.sort(key=lambda x: (x.date, x.start_time))
-
         return all_events
