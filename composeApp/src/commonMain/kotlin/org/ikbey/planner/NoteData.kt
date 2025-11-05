@@ -7,5 +7,10 @@ data class NoteData(
     val note: String,
     val isInterval: Boolean,
     val isNotification: Boolean = false,
-    val date: String? = null // Добавим поле для даты
+    val date: String? = null,
+    val type: NoteType = NoteType.USER_NOTE
 )
+
+enum class NoteType {
+    USER_NOTE, SCHEDULE, CALENDAR_EVENT
+}
