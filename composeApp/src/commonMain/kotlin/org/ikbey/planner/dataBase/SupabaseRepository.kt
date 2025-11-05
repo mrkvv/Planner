@@ -11,7 +11,7 @@ import kotlinx.serialization.json.Json
  * # Для его работы нужно вставить API-ключ */
 class SupabaseRepository {
     private val baseUrl = "https://pjcbyabqlgpjvkozojvc.supabase.co/rest/v1"
-    private val apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqY2J5YWJxbGdwanZrb3pvanZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA5MDYyMDksImV4cCI6MjA3NjQ4MjIwOX0.ecGxgqkSZl-USCC7tUxisGfA9fryIxxO7510NqaRsPo"
+    private val apiKey = "API_KEY"
 
     private val client = HttpClient {
         install(ContentNegotiation) {
