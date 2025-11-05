@@ -31,6 +31,7 @@ data class Schedule(
     val end_time: String,
     val teacher: String? = null,
     val audithory: String? = null,
+    val place: String? = null,
     val is_done: Boolean = false
 )
 
