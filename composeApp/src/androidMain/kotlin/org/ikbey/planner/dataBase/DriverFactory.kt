@@ -20,7 +20,7 @@ actual class DriverFactory actual constructor() {
         return AndroidSqliteDriver(
             schema = LocalDatabase.Schema,
             context = AndroidContext.applicationContext,
-            name = "local.db"
+            name = "1local.db"
         )
     }
 }

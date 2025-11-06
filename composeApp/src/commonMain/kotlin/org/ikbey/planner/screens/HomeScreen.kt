@@ -67,10 +67,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
 import org.ikbey.planner.dataBase.*
-
+import org.ikbey.planner.notification.NotificationManager
 
 @Composable
 fun HomeScreen(
+    notificationManager: NotificationManager,
     selectedYear: Int,
     selectedMonth: Int,
     selectedDay: Int,
@@ -215,28 +216,28 @@ fun HomeScreen(
             .fillMaxSize()
             .background(Yellow)
             .pointerInput(Unit) {
-            detectHorizontalDragGestures(
-                onDragStart = { change ->
-                    val start = change.x
-                    val screenWidth = size.width
-                    isLeftSwipeActive = start < screenWidth * 0.40f
-                    isRightSwipeActive = start > screenWidth * 0.60f
-                },
-                onHorizontalDrag = {change, dragAmount ->
-                    if (isLeftSwipeActive && dragAmount > 50f){
-                        onSwipeToMonth()
-                    }
-                    if (isRightSwipeActive && dragAmount < -50f){
-                        onSwipeToEvents()
-                    }
-                },
+                detectHorizontalDragGestures(
+                    onDragStart = { change ->
+                        val start = change.x
+                        val screenWidth = size.width
+                        isLeftSwipeActive = start < screenWidth * 0.40f
+                        isRightSwipeActive = start > screenWidth * 0.60f
+                    },
+                    onHorizontalDrag = {change, dragAmount ->
+                        if (isLeftSwipeActive && dragAmount > 50f){
+                            onSwipeToMonth()
+                        }
+                        if (isRightSwipeActive && dragAmount < -50f){
+                            onSwipeToEvents()
+                        }
+                    },
 
-                onDragEnd = {
-                    isLeftSwipeActive = false
-                    isRightSwipeActive = false
-                }
-            )
-        }
+                    onDragEnd = {
+                        isLeftSwipeActive = false
+                        isRightSwipeActive = false
+                    }
+                )
+            }
     ) {
         if (isLeftSwipeActive) {
             Box(
@@ -340,7 +341,7 @@ fun HomeScreen(
                 NotesSection(
                     items = allItems,
                     scrollState = scrollState,
-                    onNoteClick = { noteData, note ->
+                    onNoteClick = {noteData, note ->
                         selectedNote = note
                         selectedNoteData = noteData
                         showNoteDetail = true
@@ -410,8 +411,20 @@ fun HomeScreen(
                                 val date = formatDate(selectedYear, selectedMonth, selectedDay)
                                 val noteWithDate = noteData.copy(date = date)
                                 val note = noteWithDate.toUserNote()
+
+                                println("🔔 [DEBUG] Создаем заметку с уведомлением: ${noteData.isNotification}")
+                                println("🔔 [DEBUG] Время: ${note.start_time}, Дата: ${note.date}")
+
                                 localDb.insertUserNote(note)
                                 isListChanged = !isListChanged
+
+                                // Уведомления для пользовательских заметок
+                                if (note.is_notifications_enabled == true) {
+                                    println("🔔 [DEBUG] Вызываем scheduleNotification для заметки ${note.id}")
+                                    notificationManager.scheduleNotification(note)
+                                } else {
+                                    println("🔔 [DEBUG] Уведомление отключено для заметки ${note.id}")
+                                }
                             } catch (e: Exception) {
                                 println("ERROR: Ошибка при добавлении заметки: ${e.message}")
                             }
@@ -426,6 +439,7 @@ fun HomeScreen(
 
     if (showNoteDetail && selectedNote != null && selectedNoteData != null) {
         NoteDetailDialog(
+            notificationManager = notificationManager, // Передаем менеджер уведомлений
             note = selectedNote!!,
             noteData = selectedNoteData!!,
             onDismiss = {
@@ -437,6 +451,8 @@ fun HomeScreen(
                 if (selectedNoteData?.type == NoteType.USER_NOTE) {
                     coroutineScope.launch {
                         try {
+                            // Отменяем уведомление при удалении
+                            notificationManager.cancelNotification(selectedNote!!.id)
                             localDb.deleteUserNote(selectedNote!!.id)
                             isListChanged = !isListChanged
                             showNoteDetail = false
@@ -458,6 +474,18 @@ fun HomeScreen(
                         try {
                             localDb.insertUserNote(updatedNote)
                             isListChanged = !isListChanged
+
+                            // Обновляем уведомления
+                            println("🔔 [DEBUG] Обновляем заметку ${updatedNote.id}")
+                            println("🔔 [DEBUG] Уведомление включено: ${updatedNote.is_notifications_enabled}")
+
+                            if (updatedNote.is_notifications_enabled == true) {
+                                println("🔔 [DEBUG] Вызываем scheduleNotification для обновленной заметки ${updatedNote.id}")
+                                notificationManager.scheduleNotification(updatedNote)
+                            } else {
+                                println("🔔 [DEBUG] Отменяем уведомление для заметки ${updatedNote.id}")
+                                notificationManager.cancelNotification(updatedNote.id)
+                            }
                         } catch (e: Exception) {
                             println("ERROR: Ошибка при обновлении заметки: ${e.message}")
                         }
@@ -514,7 +542,6 @@ fun NotesSection(
         Spacer(modifier = Modifier.height(40.dp))
     }
 }
-
 @Composable
 fun NoteCard(
     note: Note,
@@ -642,8 +669,8 @@ fun NoteCard(
     }
 }
 
-
 private fun getHeaderAndBody(note: Note): Pair<String, String> {
+
     if (!note.header.isNullOrEmpty() && !note.note.isNullOrEmpty()) {
         return note.header to note.note
     }
@@ -672,9 +699,9 @@ private fun getHeaderAndBody(note: Note): Pair<String, String> {
     }
 }
 
-
 @Composable
 fun NoteDetailDialog(
+    notificationManager: NotificationManager,
     note: Note,
     noteData: NoteData,
     onDismiss: () -> Unit,
@@ -691,6 +718,7 @@ fun NoteDetailDialog(
         )
     } else {
         EditableNoteDetailDialog(
+            notificationManager = notificationManager,
             note = note,
             onDismiss = onDismiss,
             onDelete = onDelete,
@@ -835,6 +863,7 @@ fun ReadOnlyNoteDetailDialog(
 
 @Composable
 fun EditableNoteDetailDialog(
+    notificationManager: NotificationManager,
     note: Note,
     onDismiss: () -> Unit,
     onDelete: () -> Unit,
@@ -887,7 +916,20 @@ fun EditableNoteDetailDialog(
         if (!hasTimeError && !hasIntervalError && !hasNoteError) {
             coroutineScope.launch {
                 val updatedNote = createUpdatedNote(originalNote, startTime, endTime, location, noteText, isInterval, isNotification)
+
+                println("🔔 [DEBUG] Обновляем заметку ${updatedNote.id}")
+                println("🔔 [DEBUG] Уведомление включено: $isNotification")
+
                 onUpdate(updatedNote)
+
+                // Обновляем уведомления
+                if (updatedNote.is_notifications_enabled == true) {
+                    println("🔔 [DEBUG] Вызываем scheduleNotification для обновленной заметки ${updatedNote.id}")
+                    notificationManager.scheduleNotification(updatedNote)
+                } else {
+                    println("🔔 [DEBUG] Отменяем уведомление для заметки ${updatedNote.id}")
+                    notificationManager.cancelNotification(updatedNote.id)
+                }
             }
         }
     }
@@ -1109,6 +1151,26 @@ fun EditableNoteDetailDialog(
     }
 }
 
+fun isValidTimeInterval(startTime: String, endTime: String): Boolean {
+    if (!isValidTime(startTime) || !isValidTime(endTime)) return false
+
+    val startMinutes = timeToMinutes(startTime)
+    val endMinutes = timeToMinutes(endTime)
+
+    return endMinutes > startMinutes
+}
+
+private fun timeToMinutes(time: String?): Int {
+    if (time.isNullOrEmpty() || time.length != 5 || time[2] != ':') return Int.MAX_VALUE
+
+    return try {
+        val (hours, minutes) = time.split(":").map { it.toInt() }
+        hours * 60 + minutes
+    } catch (e: Exception) {
+        println("ERROR: Invalid time format: $time, error: ${e.message}")
+        Int.MAX_VALUE
+    }
+}
 private fun createUpdatedNote(
     originalNote: Note,
     startTime: String,
@@ -1142,26 +1204,6 @@ private fun createUpdatedNote(
     )
 }
 
-private fun timeToMinutes(time: String?): Int {
-    if (time.isNullOrEmpty() || time.length != 5 || time[2] != ':') return Int.MAX_VALUE
-
-    return try {
-        val (hours, minutes) = time.split(":").map { it.toInt() }
-        hours * 60 + minutes
-    } catch (e: Exception) {
-        println("ERROR: Invalid time format: $time, error: ${e.message}")
-        Int.MAX_VALUE
-    }
-}
-
-fun isValidTimeInterval(startTime: String, endTime: String): Boolean {
-    if (!isValidTime(startTime) || !isValidTime(endTime)) return false
-
-    val startMinutes = timeToMinutes(startTime)
-    val endMinutes = timeToMinutes(endTime)
-
-    return endMinutes > startMinutes
-}
 
 private fun compareNotesAdvanced(note1: Note, note2: Note): Int {
     val time1 = note1.start_time ?: ""
@@ -1255,6 +1297,7 @@ fun DaysScrollList(
 fun DayItem(day: Int, isSelected: Boolean = false, onClick: () -> Unit = {}) {
     val backgroundColor = if (isSelected) LightOrange else Color.Transparent
     val textColor = if (isSelected) DarkOrange else Color.Black
+
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(15.dp))
@@ -1285,6 +1328,7 @@ fun DayWeekText(
     modifier: Modifier = Modifier
 ) {
     val dayOfWeek = calendarManager.getDayOfWeekName(calendarManager.calculateDayOfWeek(year, month, day))
+
     Text(
         text = "$dayOfWeek, $day",
         modifier = modifier,
@@ -1351,10 +1395,12 @@ fun BottomSheetMenu(
     var isInterval by remember { mutableStateOf(false) }
     var isNotification by remember { mutableStateOf(false) }
 
+    // Состояние для ошибок валидации
     var timeError by remember { mutableStateOf(false) }
     var noteError by remember { mutableStateOf(false) }
     var intervalError by remember { mutableStateOf(false) }
 
+    // Проверяем, можно ли добавить заметку
     val canAddNote = remember(startTime, endTime, note, isInterval) {
         val isStartTimeValid = isValidTime(startTime)
         val isEndTimeValid = if (isInterval) isValidTime(endTime) else true
@@ -1394,7 +1440,6 @@ fun BottomSheetMenu(
                 )
 
                 Spacer(modifier = Modifier.width(20.dp))
-
                 UnifiedTimeInputField(
                     startTime = startTime,
                     endTime = endTime,
@@ -1426,6 +1471,8 @@ fun BottomSheetMenu(
                         .fillMaxWidth()
                         .padding(horizontal = 26.dp)
                         .padding(top = 4.dp)
+
+
                 )
             }
 
@@ -1494,7 +1541,7 @@ fun BottomSheetMenu(
                 horizontalArrangement = Arrangement.Start
             ) {
                 Text(
-                    text = "Место",
+                    "Место",
                     fontFamily = getInterFont(InterFontType.REGULAR),
                     fontSize = 20.sp,
                     color = DarkGreen
@@ -1508,7 +1555,6 @@ fun BottomSheetMenu(
                     modifier = Modifier.fillMaxWidth(0.9f)
                 )
             }
-
             Spacer(modifier = Modifier.height(20.dp))
 
             SimpleInputField(
@@ -1599,6 +1645,7 @@ fun BottomSheetMenu(
                         maxLines = 1
                     )
                 }
+
             }
         }
     }
