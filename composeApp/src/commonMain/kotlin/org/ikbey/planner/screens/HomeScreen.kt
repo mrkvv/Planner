@@ -58,6 +58,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import kotlinx.coroutines.delay
@@ -1409,6 +1410,9 @@ fun BottomSheetMenu(
         isStartTimeValid && isEndTimeValid && isIntervalValid && note.isNotBlank()
     }
 
+    // Для закрытия клавиатуры при нажатии на область BottomSheetMenu
+    val focusManager = LocalFocusManager.current
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -1417,7 +1421,7 @@ fun BottomSheetMenu(
                 color = LightGreen,
                 shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
             )
-            .clickable {}
+            .clickable { focusManager.clearFocus() }
     ) {
         Column(
             modifier = Modifier
