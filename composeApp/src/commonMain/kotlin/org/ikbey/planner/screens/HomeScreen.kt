@@ -7,7 +7,9 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,10 +58,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import kotlinx.coroutines.delay
@@ -741,69 +746,50 @@ fun ReadOnlyNoteDetailDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(400.dp)
-                .background(
-                    color = LightGreen,
-                    shape = RoundedCornerShape(16.dp)
-                )
-                .padding(vertical = 20.dp, horizontal = 16.dp)
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = { onDismiss() }
+                    )
+                }
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        color = LightGreen,
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .padding(vertical = 20.dp, horizontal = 16.dp)
             ) {
-                Text(
-                    text = when (noteData.type) {
-                        NoteType.SCHEDULE -> "Расписание"
-                        NoteType.CALENDAR_EVENT -> "Мероприятие"
-                        else -> "Заметка"
-                    },
-                    fontFamily = getInterFont(InterFontType.REGULAR),
-                    fontSize = 24.sp,
-                    color = Black
-                )
-            }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = when (noteData.type) {
+                            NoteType.SCHEDULE -> "Расписание"
+                            NoteType.CALENDAR_EVENT -> "Мероприятие"
+                            else -> "Заметка"
+                        },
+                        fontFamily = getInterFont(InterFontType.REGULAR),
+                        fontSize = 24.sp,
+                        color = Black
+                    )
+                }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Время:",
-                    fontFamily = getInterFont(InterFontType.REGULAR),
-                    fontSize = 20.sp,
-                    color = DarkGreen
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Text(
-                    text = if (noteData.isInterval) {
-                        "${noteData.startTime} - ${noteData.endTime}"
-                    } else {
-                        noteData.startTime
-                    },
-                    fontFamily = getInterFont(InterFontType.SEMI_BOLD),
-                    fontSize = 20.sp,
-                    color = Black
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            if (noteData.location.isNotEmpty()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Место:",
+                        text = "Время:",
                         fontFamily = getInterFont(InterFontType.REGULAR),
                         fontSize = 20.sp,
                         color = DarkGreen
@@ -812,7 +798,11 @@ fun ReadOnlyNoteDetailDialog(
                     Spacer(modifier = Modifier.width(8.dp))
 
                     Text(
-                        text = noteData.location,
+                        text = if (noteData.isInterval) {
+                            "${noteData.startTime} - ${noteData.endTime}"
+                        } else {
+                            noteData.startTime
+                        },
                         fontFamily = getInterFont(InterFontType.SEMI_BOLD),
                         fontSize = 20.sp,
                         color = Black
@@ -820,43 +810,68 @@ fun ReadOnlyNoteDetailDialog(
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-            }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .background(
-                        color = Color.White,
-                        shape = RoundedCornerShape(8.dp)
-                    )
-                    .verticalScroll(scrollState)
-                    .padding(12.dp)
-            ) {
-                val (header, body) = getHeaderAndBody(note)
+                if (noteData.location.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Место:",
+                            fontFamily = getInterFont(InterFontType.REGULAR),
+                            fontSize = 20.sp,
+                            color = DarkGreen
+                        )
 
-                if (header.isNotEmpty()) {
-                    Text(
-                        text = header,
-                        fontFamily = getInterFont(InterFontType.SEMI_BOLD),
-                        fontSize = 20.sp,
-                        color = Black,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                        Spacer(modifier = Modifier.width(8.dp))
 
-                    if (body.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = noteData.location,
+                            fontFamily = getInterFont(InterFontType.SEMI_BOLD),
+                            fontSize = 20.sp,
+                            color = Black
+                        )
                     }
+
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                if (body.isNotEmpty()) {
-                    Text(
-                        text = body,
-                        fontFamily = getInterFont(InterFontType.REGULAR),
-                        fontSize = 20.sp,
-                        color = Black,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .background(
+                            color = Color.White,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .verticalScroll(scrollState)
+                        .padding(12.dp)
+                ) {
+                    val (header, body) = getHeaderAndBody(note)
+
+                    if (header.isNotEmpty()) {
+                        Text(
+                            text = header,
+                            fontFamily = getInterFont(InterFontType.SEMI_BOLD),
+                            fontSize = 20.sp,
+                            color = Black,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        if (body.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+
+                    if (body.isNotEmpty()) {
+                        Text(
+                            text = body,
+                            fontFamily = getInterFont(InterFontType.REGULAR),
+                            fontSize = 20.sp,
+                            color = Black,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
         }
@@ -871,19 +886,25 @@ fun EditableNoteDetailDialog(
     onDelete: () -> Unit,
     onUpdate: (Note) -> Unit
 ) {
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val dialogFocusRequester = remember { FocusRequester() }
+
     val localDb = ServiceLocator.localDatabaseManager
     val coroutineScope = rememberCoroutineScope()
 
     var startTime by remember { mutableStateOf(note.start_time ?: "") }
     var endTime by remember { mutableStateOf(note.end_time ?: "") }
     var location by remember { mutableStateOf(note.place ?: "") }
-    var noteText by remember { mutableStateOf(
-        if (!note.header.isNullOrEmpty() && !note.note.isNullOrEmpty()) {
-            "${note.header}\n${note.note}"
-        } else {
-            note.header ?: note.note ?: ""
-        }
-    ) }
+    var noteText by remember {
+        mutableStateOf(
+            if (!note.header.isNullOrEmpty() && !note.note.isNullOrEmpty()) {
+                "${note.header}\n${note.note}"
+            } else {
+                note.header ?: note.note ?: ""
+            }
+        )
+    }
     var isInterval by remember { mutableStateOf(!note.end_time.isNullOrEmpty()) }
     var isNotification by remember { mutableStateOf(note.is_notifications_enabled == true) }
 
@@ -902,29 +923,39 @@ fun EditableNoteDetailDialog(
         isStartTimeValid && isEndTimeValid && isIntervalValid && noteText.isNotBlank()
     }
 
-    val saveChangesIfValid = {
-        val hasTimeError = if (isInterval) {
-            !isValidTime(startTime) || !isValidTime(endTime)
-        } else {
-            !isValidTime(startTime)
+    LaunchedEffect(Unit) {
+        delay(100)
+        dialogFocusRequester.requestFocus()
+    }
+
+    val hideKeyboard: () -> Unit = {
+        println("🔔 [DEBUG] Скрываем клавиатуру через FocusRequester")
+        coroutineScope.launch {
+            dialogFocusRequester.requestFocus()
+            delay(10)
+            focusManager.clearFocus()
+            keyboardController?.hide()
         }
-        val hasIntervalError = isInterval && !isValidTimeInterval(startTime, endTime)
-        val hasNoteError = noteText.isBlank()
+    }
 
-        timeError = hasTimeError
-        intervalError = hasIntervalError
-        noteError = hasNoteError
-
-        if (!hasTimeError && !hasIntervalError && !hasNoteError) {
+    val saveChangesIfValid = {
+        if (canSaveChanges) {
             coroutineScope.launch {
-                val updatedNote = createUpdatedNote(originalNote, startTime, endTime, location, noteText, isInterval, isNotification)
+                val updatedNote = createUpdatedNote(
+                    originalNote,
+                    startTime,
+                    endTime,
+                    location,
+                    noteText,
+                    isInterval,
+                    isNotification
+                )
 
                 println("🔔 [DEBUG] Обновляем заметку ${updatedNote.id}")
                 println("🔔 [DEBUG] Уведомление включено: $isNotification")
 
                 onUpdate(updatedNote)
 
-                // Обновляем уведомления
                 if (updatedNote.is_notifications_enabled == true) {
                     println("🔔 [DEBUG] Вызываем scheduleNotification для обновленной заметки ${updatedNote.id}")
                     notificationManager.scheduleNotification(updatedNote)
@@ -932,221 +963,240 @@ fun EditableNoteDetailDialog(
                     println("🔔 [DEBUG] Отменяем уведомление для заметки ${updatedNote.id}")
                     notificationManager.cancelNotification(updatedNote.id)
                 }
+                onDismiss()
             }
+        } else {
+            onDismiss()
         }
     }
 
     Dialog(
         onDismissRequest = {
+            hideKeyboard()
             saveChangesIfValid()
-            onDismiss()
         },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(550.dp)
+                .height(560.dp)
                 .background(
                     color = LightGreen,
                     shape = RoundedCornerShape(16.dp)
                 )
-                .padding(vertical = 20.dp)
+                .focusRequester(dialogFocusRequester)
+                .focusable()
+                .clickable { hideKeyboard() }
         ) {
-            Row(
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 26.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Start
+                    .fillMaxSize()
+                    .padding(vertical = 20.dp)
             ) {
-                Text(
-                    text = "Время",
-                    fontFamily = getInterFont(InterFontType.REGULAR),
-                    fontSize = 24.sp,
-                    color = Color.Black
-                )
-
-                Spacer(modifier = Modifier.width(20.dp))
-
-                UnifiedTimeInputField(
-                    startTime = startTime,
-                    endTime = endTime,
-                    isInterval = isInterval,
-                    onStartTimeChange = {
-                        startTime = it
-                        timeError = !isValidTime(it) || (isInterval && !isValidTime(endTime))
-                        intervalError = isInterval && !isValidTimeInterval(startTime, endTime)
-                    },
-                    onEndTimeChange = {
-                        endTime = it
-                        timeError = !isValidTime(startTime) || (isInterval && !isValidTime(it))
-                        intervalError = isInterval && !isValidTimeInterval(startTime, endTime)
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            if (timeError || intervalError) {
-                Text(
-                    text = when {
-                        intervalError -> "Некорректный интервал"
-                        timeError && isInterval -> "Укажите время полностью"
-                        else -> "Укажите время полностью"
-                    },
-                    color = DarkGreen,
-                    fontSize = 14.sp,
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 26.dp)
-                        .padding(top = 4.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 26.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End
-            ) {
-                Text(
-                    text = "Интервал",
-                    fontFamily = getInterFont(InterFontType.REGULAR),
-                    fontSize = 20.sp,
-                    color = DarkGreen
-                )
-
-                Spacer(modifier = Modifier.width(14.dp))
-
-                Switch(
-                    checked = isInterval,
-                    onCheckedChange = {
-                        isInterval = it
-                        if (it) {
-                            timeError = !isValidTime(startTime) || !isValidTime(endTime)
-                            intervalError = !isValidTimeInterval(startTime, endTime)
-                        } else {
-                            timeError = !isValidTime(startTime)
-                            intervalError = false
-                        }
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = DarkGreen,
-                        checkedTrackColor = SwitchGreen,
-                        uncheckedThumbColor = DarkGreen,
-                        uncheckedTrackColor = LightGray
-                    )
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 26.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Заметка",
-                    fontFamily = getInterFont(InterFontType.REGULAR),
-                    fontSize = 24.sp,
-                    color = Color.Black
-                )
-
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Start
-            ) {
-                Text(
-                    text = "Место",
-                    modifier = Modifier
-                        .padding(horizontal = 10.dp),
-                    fontFamily = getInterFont(InterFontType.REGULAR),
-                    fontSize = 20.sp,
-                    color = DarkGreen
-                )
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                SimpleLocationField(
-                    value = location,
-                    onValueChange = { location = it },
-                    modifier = Modifier.fillMaxWidth(0.9f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            SimpleInputField(
-                value = noteText,
-                onValueChange = {
-                    noteText = it
-                    noteError = it.isBlank()
-                },
-                placeholder = "Заголовок",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
-                    .height(250.dp)
-            )
-
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .fillMaxSize()
                 ) {
-                    Switch(
-                        checked = isNotification,
-                        onCheckedChange = { isNotification = it },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = DarkGreen,
-                            checkedTrackColor = SwitchGreen,
-                            uncheckedThumbColor = DarkGreen,
-                            uncheckedTrackColor = LightGray
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 26.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Start
+                    ) {
+                        Text(
+                            text = "Время",
+                            fontFamily = getInterFont(InterFontType.REGULAR),
+                            fontSize = 24.sp,
+                            color = Color.Black
                         )
-                    )
-                    Text(
-                        "Уведомление",
-                        fontFamily = getInterFont(InterFontType.REGULAR),
-                        fontSize = 20.sp,
-                        color = DarkGreen
-                    )
-                }
 
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .clickable { onDelete() }
-                        .background(Color.Transparent),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.trash,
-                        contentDescription = "Удалить заметку",
-                        modifier = Modifier.size(24.dp),
-                        tint = DarkGreen
+                        Spacer(modifier = Modifier.width(20.dp))
+
+                        UnifiedTimeInputField(
+                            startTime = startTime,
+                            endTime = endTime,
+                            isInterval = isInterval,
+                            onStartTimeChange = {
+                                startTime = it
+                                timeError =
+                                    !isValidTime(it) || (isInterval && !isValidTime(endTime))
+                                intervalError =
+                                    isInterval && !isValidTimeInterval(startTime, endTime)
+                            },
+                            onEndTimeChange = {
+                                endTime = it
+                                timeError =
+                                    !isValidTime(startTime) || (isInterval && !isValidTime(it))
+                                intervalError =
+                                    isInterval && !isValidTimeInterval(startTime, endTime)
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    if (timeError || intervalError) {
+                        Text(
+                            text = when {
+                                intervalError -> "Некорректный интервал"
+                                timeError && isInterval -> "Укажите время полностью"
+                                else -> "Укажите время полностью"
+                            },
+                            color = DarkGreen,
+                            fontSize = 14.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 26.dp)
+                                .padding(top = 4.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 26.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Text(
+                            text = "Интервал",
+                            fontFamily = getInterFont(InterFontType.REGULAR),
+                            fontSize = 20.sp,
+                            color = DarkGreen
+                        )
+
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Switch(
+                            checked = isInterval,
+                            onCheckedChange = {
+                                isInterval = it
+                                if (it) {
+                                    timeError = !isValidTime(startTime) || !isValidTime(endTime)
+                                    intervalError = !isValidTimeInterval(startTime, endTime)
+                                } else {
+                                    timeError = !isValidTime(startTime)
+                                    intervalError = false
+                                }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = DarkGreen,
+                                checkedTrackColor = SwitchGreen,
+                                uncheckedThumbColor = DarkGreen,
+                                uncheckedTrackColor = LightGray
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 26.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Заметка",
+                            fontFamily = getInterFont(InterFontType.REGULAR),
+                            fontSize = 24.sp,
+                            color = Color.Black
+                        )
+
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Start
+                    ) {
+                        Text(
+                            text = "Место",
+                            modifier = Modifier
+                                .padding(horizontal = 10.dp),
+                            fontFamily = getInterFont(InterFontType.REGULAR),
+                            fontSize = 20.sp,
+                            color = DarkGreen
+                        )
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        SimpleLocationField(
+                            value = location,
+                            onValueChange = { location = it },
+                            modifier = Modifier.fillMaxWidth(0.9f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    SimpleInputField(
+                        value = noteText,
+                        onValueChange = {
+                            noteText = it
+                            noteError = it.isBlank()
+                        },
+                        placeholder = "Заголовок",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp)
+                            .height(250.dp)
                     )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Switch(
+                                checked = isNotification,
+                                onCheckedChange = { isNotification = it },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = DarkGreen,
+                                    checkedTrackColor = SwitchGreen,
+                                    uncheckedThumbColor = DarkGreen,
+                                    uncheckedTrackColor = LightGray
+                                )
+                            )
+                            Text(
+                                "Уведомление",
+                                fontFamily = getInterFont(InterFontType.REGULAR),
+                                fontSize = 20.sp,
+                                color = DarkGreen
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .clickable { onDelete() }
+                                .background(Color.Transparent),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.trash,
+                                contentDescription = "Удалить заметку",
+                                modifier = Modifier.size(24.dp),
+                                tint = DarkGreen
+                            )
+                        }
+                    }
                 }
             }
         }
