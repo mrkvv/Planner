@@ -9,78 +9,56 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import org.jetbrains.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.ui.modifier.modifierLocalOf
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.window.Dialog
 import androidx.compose.material3.Card
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialogDefaults.containerColor
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Scaffold
-import androidx.compose.ui.text.style.LineHeightStyle
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.isTraceInProgress
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.style.TextAlign
 import org.ikbey.planner.DarkGreen
 import org.ikbey.planner.IconType
 import org.ikbey.planner.getIcon
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.input.pointer.PointerInputChange
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.DialogProperties
-import kotlinx.coroutines.InternalForInheritanceCoroutinesApi
 import kotlinx.coroutines.launch
 import org.ikbey.planner.*
 import org.ikbey.planner.dataBase.CalendarEvent
-import org.ikbey.planner.dataBase.LocalDatabaseManager
 import org.ikbey.planner.dataBase.ServiceLocator
-import org.ikbey.planner.dataBase.SyncManager
-import org.ikbey.planner.localDB.LocalDatabase
-
 
 @Composable
 fun EventsScreen(
     onBackClick: () -> Unit,
     onSwipeToHome: () -> Unit,
     modifier: Modifier = Modifier,
-
 ) {
     val localDb = ServiceLocator.localDatabaseManager
 
@@ -151,13 +129,13 @@ fun EventsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start= 16.dp, top = 40.dp, end = 16.dp)
+                .systemBarsPadding()
+                .padding(start= 10.dp, end = 10.dp)
         ){
-            Spacer(modifier = Modifier.height(20.dp))
-
             Row(
                 modifier = Modifier
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .padding(start = 10.dp, end = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ){
@@ -168,45 +146,46 @@ fun EventsScreen(
                     color = Color.Black,
                 )
 
-                SettingsButton(
-                    isSettingsOpen = showSettings,
-                    onClick = {showSettings = true}
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-            ){
-                Icon(
-                    imageVector = getIcon(IconType.FILTER),
-                    contentDescription = "Фильтр",
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(end = 13.dp)
-                        .size(32.dp)
-                        .clickable { showFilters = true },
-                    tint = DarkGreen
-                )
-
-                if (filteredEvents.value.isNotEmpty()) {
-                    EventsList(events = filteredEvents.value)
-                }
-                else {
+                Column (
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    SettingsButton(
+                        isSettingsOpen = showSettings,
+                        onClick = {showSettings = true}
+                    )
                     Box(
                         modifier = Modifier
-                            .fillMaxSize(),
+                            .clip(CircleShape)
+                            .size(48.dp)
+                            .clickable { showFilters = true },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "Пока мероприятий нет :(",
-                            fontFamily = getInterFont(InterFontType.REGULAR),
-                            fontSize = 20.sp,
-                            color = DarkGreen
+                        Icon(
+                            imageVector = getIcon(IconType.FILTER),
+                            contentDescription = "Фильтр",
+                            modifier = Modifier.size(32.dp),
+                            tint = DarkGreen
                         )
                     }
+                }
+            }
+
+            if (filteredEvents.value.isNotEmpty()) {
+                EventsList(events = filteredEvents.value)
+            }
+            else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Пока мероприятий нет :(",
+                        fontFamily = getInterFont(InterFontType.REGULAR),
+                        fontSize = 20.sp,
+                        color = DarkGreen
+                    )
                 }
             }
         }
@@ -315,7 +294,7 @@ fun DateHeader(date: String) {
         color = DarkOrange,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp)
+            .padding(top = 2.dp, bottom = 2.dp, start = 12.dp)
     )
 }
 
@@ -350,14 +329,12 @@ fun EventItem(event: CalendarEvent) {
                     fontSize = 20.sp,
                     color = DarkGreen
                 )
-                if (event.end_time != null) {
-                    Text(
-                        text = formatTime(event.end_time),
-                        fontFamily = getInterFont(InterFontType.REGULAR),
-                        fontSize = 20.sp,
-                        color = DarkGreen
-                    )
-                }
+                Text(
+                    text = formatTime(event.end_time),
+                    fontFamily = getInterFont(InterFontType.REGULAR),
+                    fontSize = 20.sp,
+                    color = DarkGreen
+                )
             }
 
             Spacer(modifier = Modifier.width(6.dp))
@@ -373,7 +350,7 @@ fun EventItem(event: CalendarEvent) {
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                val eventTitle = "${event.title}"
+                val eventTitle = event.title
 
                 Text(
                     text = eventTitle,
@@ -430,6 +407,7 @@ fun TrackButton(
 ) {
     Box(
         modifier = modifier
+            .clip(CircleShape)
             .clickable { onToggle() }
             .background(
                 color = if (isTracked) DarkGreen else Color.Transparent,
@@ -459,10 +437,7 @@ fun EventsList(events: List<CalendarEvent>) {
         .sortedBy { it.first }
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(top = 32.dp)
-
+        modifier = Modifier.fillMaxSize()
     ) {
         stickyHeader {
             Box(
