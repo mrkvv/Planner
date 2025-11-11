@@ -44,11 +44,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.ikbey.planner.dataBase.ServiceLocator
@@ -77,7 +82,24 @@ fun SettingsCard(
 
     var isLoading by remember { mutableStateOf(false) }
 
-    // Используем LaunchedEffect для загрузки данных при каждом открытии
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val dialogFocusRequester = remember { FocusRequester() }
+
+    val hideKeyboard: () -> Unit = {
+        coroutineScope.launch {
+            dialogFocusRequester.requestFocus()
+            delay(10)
+            focusManager.clearFocus()
+            keyboardController?.hide()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        delay(100)
+        dialogFocusRequester.requestFocus()
+    }
+
     LaunchedEffect(Unit) {
         faculties.value = localDb.getFaculties()
 
@@ -92,13 +114,9 @@ fun SettingsCard(
             if (currentGroup != null) {
                 tempInstitute = currentGroup.faculty_id.toString()
                 groups.value = localDb.getGroupsByFaculty(currentGroup.faculty_id)
-
-                // Убедимся, что текст в поле поиска группы соответствует выбранной группе
-                // Это важно для отображения при перезаходе
-                // Мы установим это в состоянии, но для BasicTextField нужно отдельное состояние
             }
-        } else {
-            // Сбрасываем состояния если группы нет
+        }
+        else {
             tempInstitute = ""
             tempGroup = ""
             groups.value = emptyList()
@@ -108,9 +126,10 @@ fun SettingsCard(
     LaunchedEffect(tempInstitute) {
         if (tempInstitute.isNotBlank()) {
             groups.value = localDb.getGroupsByFaculty(tempInstitute.toInt())
-        } else {
+        }
+        else {
             groups.value = emptyList()
-            tempGroup = "" // Сбрасываем группу при смене института
+            tempGroup = ""
         }
     }
 
@@ -119,6 +138,7 @@ fun SettingsCard(
 
     Dialog(
         onDismissRequest = {
+            hideKeyboard()
             if (!isLoading) {
                 onDismiss()
             }
@@ -129,6 +149,7 @@ fun SettingsCard(
             modifier = Modifier
                 .fillMaxSize()
                 .clickable {
+                    hideKeyboard()
                     if (!isLoading) {
                         onDismiss()
                     }
@@ -192,14 +213,15 @@ fun SettingsCard(
                         onGroupSelected = { groupId ->
                             if (!isLoading) {
                                 tempGroup = groupId
-                                showGroups = false
+                                hideKeyboard()
                             }
                         },
-                        onToggleDropdown = {
+                        onToggleDropdown = { shouldShow ->
                             if (!isLoading && tempInstitute.isNotBlank()) {
-                                showGroups = !showGroups
+                                showGroups = shouldShow
                             }
-                        }
+                        },
+                        hideKeyboard = hideKeyboard
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -211,9 +233,11 @@ fun SettingsCard(
                                 coroutineScope.launch {
                                     syncManager.setGroupId(tempGroup.toInt())
                                     isLoading = false
+                                    hideKeyboard()
                                     onDismiss()
                                 }
                             } else if (!isLoading) {
+                                hideKeyboard()
                                 onDismiss()
                             }
                         },
@@ -290,6 +314,7 @@ fun InstituteDropdown(
                     ) {
                         Text(
                             text = faculty.abbr ?: faculty.name,
+                            fontFamily = getInterFont(InterFontType.REGULAR),
                             fontSize = 16.sp,
                             color = if (faculty.id.toString() == tempInstitute) Color(0xFFEE9528) else Color.Black
                         )
@@ -308,10 +333,12 @@ fun GroupSearchDropdown(
     tempGroup: String,
     showGroups: Boolean,
     onGroupSelected: (String) -> Unit,
-    onToggleDropdown: () -> Unit
+    onToggleDropdown: (Boolean) -> Unit,
+    hideKeyboard: () -> Unit
 ) {
     var searchText by remember { mutableStateOf("") }
     var isSearchMode by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
 
     val filteredGroups = if (searchText.isNotBlank()) {
         groups.filter { group ->
@@ -366,14 +393,19 @@ fun GroupSearchDropdown(
                 }
 
                 if (newText.isNotBlank() && !showGroups) {
-                    onToggleDropdown()
+                    onToggleDropdown(true)
                 }
             },
+            textStyle = TextStyle(
+                fontSize = 16.sp,
+                fontFamily = getInterFont(InterFontType.REGULAR),
+                color = Color.Black
+            ),
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable {
                     if (!showGroups && tempInstitute.isNotBlank()) {
-                        onToggleDropdown()
+                        onToggleDropdown(true)
                     }
                 }
                 .background(
@@ -399,9 +431,9 @@ fun GroupSearchDropdown(
             }
         )
 
-        val shouldShowList = showGroups || (isSearchMode && searchText.isNotBlank())
+        val shouldShowList = showGroups && tempInstitute.isNotBlank()
 
-        if (shouldShowList && tempInstitute.isNotBlank()) {
+        if (shouldShowList) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -430,10 +462,13 @@ fun GroupSearchDropdown(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
+                                        focusManager.clearFocus()
+                                        hideKeyboard()
+
                                         onGroupSelected(group.id.toString())
                                         isSearchMode = false
                                         searchText = group.name
-                                        onToggleDropdown()
+                                        onToggleDropdown(false)
                                     }
                                     .padding(horizontal = 16.dp, vertical = 12.dp)
                             ) {
