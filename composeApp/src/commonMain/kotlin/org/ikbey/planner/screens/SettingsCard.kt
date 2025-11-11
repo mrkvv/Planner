@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -45,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
@@ -75,6 +77,7 @@ fun SettingsCard(
 
     var isLoading by remember { mutableStateOf(false) }
 
+    // Используем LaunchedEffect для загрузки данных при каждом открытии
     LaunchedEffect(Unit) {
         faculties.value = localDb.getFaculties()
 
@@ -89,16 +92,25 @@ fun SettingsCard(
             if (currentGroup != null) {
                 tempInstitute = currentGroup.faculty_id.toString()
                 groups.value = localDb.getGroupsByFaculty(currentGroup.faculty_id)
+
+                // Убедимся, что текст в поле поиска группы соответствует выбранной группе
+                // Это важно для отображения при перезаходе
+                // Мы установим это в состоянии, но для BasicTextField нужно отдельное состояние
             }
+        } else {
+            // Сбрасываем состояния если группы нет
+            tempInstitute = ""
+            tempGroup = ""
+            groups.value = emptyList()
         }
     }
 
     LaunchedEffect(tempInstitute) {
         if (tempInstitute.isNotBlank()) {
             groups.value = localDb.getGroupsByFaculty(tempInstitute.toInt())
-        }
-        else {
+        } else {
             groups.value = emptyList()
+            tempGroup = "" // Сбрасываем группу при смене института
         }
     }
 
@@ -172,7 +184,7 @@ fun SettingsCard(
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
 
-                    GroupDropdown(
+                    GroupSearchDropdown(
                         groups = groups.value,
                         tempInstitute = tempInstitute,
                         tempGroup = tempGroup,
@@ -290,7 +302,7 @@ fun InstituteDropdown(
 }
 
 @Composable
-fun GroupDropdown(
+fun GroupSearchDropdown(
     groups: List<Group>,
     tempInstitute: String,
     tempGroup: String,
@@ -298,70 +310,147 @@ fun GroupDropdown(
     onGroupSelected: (String) -> Unit,
     onToggleDropdown: () -> Unit
 ) {
-    val selectedGroup = groups.find { it.id.toString() == tempGroup }
-    val displayText = selectedGroup?.name ?: "Выберите группу"
+    var searchText by remember { mutableStateOf("") }
+    var isSearchMode by remember { mutableStateOf(false) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable {
-                if (tempInstitute.isNotBlank()) {
-                    onToggleDropdown()
-                }
-            }
-            .background(
-                if (tempInstitute.isBlank()) Color(0xFFF5F5F5).copy(alpha = 0.5f)
-                else Color(0xFFF5F5F5),
-                RoundedCornerShape(8.dp)
-            )
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = displayText,
-                fontSize = 16.sp,
-                color = when {
-                    tempInstitute.isBlank() -> Color.Gray.copy(alpha = 0.5f)
-                    tempGroup.isBlank() -> Color.Gray
-                    else -> Color.Black
-                }
-            )
+    val filteredGroups = if (searchText.isNotBlank()) {
+        groups.filter { group ->
+            group.name.contains(searchText, ignoreCase = true)
+        }
+    }
+    else {
+        groups
+    }
+
+    val selectedGroup = groups.find { it.id.toString() == tempGroup }
+
+    LaunchedEffect(tempGroup) {
+        if (selectedGroup != null) {
+            searchText = selectedGroup.name
+            isSearchMode = false
+        }
+        else if (tempGroup.isBlank() && !isSearchMode) {
+            searchText = ""
         }
     }
 
-    if (showGroups && tempInstitute.isNotBlank()) {
-        Card(
+    LaunchedEffect(groups) {
+        if (tempGroup.isNotBlank() && searchText.isEmpty()) {
+            val group = groups.find { it.id.toString() == tempGroup }
+            group?.let {
+                searchText = it.name
+            }
+        }
+    }
+
+    Column {
+        BasicTextField(
+            value = searchText,
+            onValueChange = { newText ->
+                searchText = newText
+                isSearchMode = true
+
+                val matchedGroup = groups.find { it.name.equals(newText, ignoreCase = true) }
+                if (matchedGroup != null) {
+                    onGroupSelected(matchedGroup.id.toString())
+                }
+                else {
+                    val partialMatch = groups.find { it.name == newText }
+
+                    if (partialMatch != null) {
+                        onGroupSelected(partialMatch.id.toString())
+                    }
+                    else {
+                        onGroupSelected("")
+                    }
+                }
+
+                if (newText.isNotBlank() && !showGroups) {
+                    onToggleDropdown()
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp),
-            elevation = CardDefaults.cardElevation(4.dp),
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            LazyColumn {
-                items(groups) { group ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onGroupSelected(group.id.toString()) }
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                    ) {
+                .clickable {
+                    if (!showGroups && tempInstitute.isNotBlank()) {
+                        onToggleDropdown()
+                    }
+                }
+                .background(
+                    if (tempInstitute.isBlank()) Color(0xFFF5F5F5)
+                    else Color(0xFFF5F5F5),
+                    RoundedCornerShape(8.dp)
+                )
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            decorationBox = { innerTextField ->
+                Box {
+                    if (searchText.isEmpty() && !isSearchMode) {
                         Text(
-                            text = group.name,
+                            text = "Введите название группы",
                             fontSize = 16.sp,
-                            color = if (group.id.toString() == tempGroup) Color(0xFFEE9528) else Color.Black
+                            color = when {
+                                tempInstitute.isBlank() -> Color.Gray
+                                else -> Color.Gray
+                            }
                         )
                     }
-                    Divider(thickness = 0.5.dp, color = Color.LightGray)
+                    innerTextField()
+                }
+            }
+        )
+
+        val shouldShowList = showGroups || (isSearchMode && searchText.isNotBlank())
+
+        if (shouldShowList && tempInstitute.isNotBlank()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                elevation = CardDefaults.cardElevation(4.dp),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                if (filteredGroups.isEmpty() && searchText.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Группы не найдены",
+                            fontSize = 16.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+                else {
+                    LazyColumn {
+                        items(filteredGroups) { group ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        onGroupSelected(group.id.toString())
+                                        isSearchMode = false
+                                        searchText = group.name
+                                        onToggleDropdown()
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                            ) {
+                                Text(
+                                    text = group.name,
+                                    fontSize = 16.sp,
+                                    color = if (group.id.toString() == tempGroup) Color(0xFFEE9528) else Color.Black
+                                )
+                            }
+                            Divider(thickness = 0.5.dp, color = Color.LightGray)
+                        }
+                    }
                 }
             }
         }
     }
 }
-
 @Composable
 fun SettingsButton(
     isSettingsOpen: Boolean,
