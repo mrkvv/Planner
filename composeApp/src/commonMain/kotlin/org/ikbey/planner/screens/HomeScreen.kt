@@ -109,6 +109,9 @@ fun HomeScreen(
     var isListChanged by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
+    var syncTrigger by remember { mutableStateOf(0) }
+
+
     LaunchedEffect(Unit) {
         try {
             isLoading = true
@@ -117,13 +120,14 @@ fun HomeScreen(
                 delay(100)
             }
             isLoading = false
+            syncTrigger++
         } catch (e: Exception) {
             println("ERROR: Failed to sync or delete init_load setting: ${e.message}")
             isLoading = false
         }
     }
 
-    LaunchedEffect(selectedYear, selectedMonth, selectedDay, isListChanged) {
+    LaunchedEffect(selectedYear, selectedMonth, selectedDay, isListChanged, syncTrigger) {
         try {
             val date = formatDate(selectedYear, selectedMonth, selectedDay)
             val loadedNotes = localDb.getUserNotesByDate(date)
@@ -136,7 +140,7 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(selectedYear, selectedMonth, selectedDay) {
+    LaunchedEffect(selectedYear, selectedMonth, selectedDay, syncTrigger) {
         try {
             val date = formatDate(selectedYear, selectedMonth, selectedDay)
             val loadedSchedules = localDb.getUserScheduleByDate(date)
@@ -146,7 +150,7 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(selectedYear, selectedMonth, selectedDay) {
+    LaunchedEffect(selectedYear, selectedMonth, selectedDay, syncTrigger) {
         try {
             val date = formatDate(selectedYear, selectedMonth, selectedDay)
             val loadedEvents = localDb.getTrackedCalendarEventsByDate(date)
