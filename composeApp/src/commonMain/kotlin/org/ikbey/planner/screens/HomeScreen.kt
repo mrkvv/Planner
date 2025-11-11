@@ -111,8 +111,6 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         try {
-            localDb.deleteSetting("init_load")
-
             isLoading = true
             val needsSync = syncManager.syncIfNeeded()
             if (needsSync) {
