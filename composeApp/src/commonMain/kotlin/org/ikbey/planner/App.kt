@@ -10,10 +10,6 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Composable
 @Preview
 fun App(notificationManager: NotificationManager) {
-    LaunchedEffect(Unit) {
-        ServiceLocator.syncManager.syncIfNeeded()
-    }
-
     MaterialTheme {
         NavGraph(notificationManager = notificationManager)
     }
