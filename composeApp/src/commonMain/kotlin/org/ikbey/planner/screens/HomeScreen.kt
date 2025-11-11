@@ -75,6 +75,7 @@ import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
 import org.ikbey.planner.dataBase.*
 import org.ikbey.planner.notification.NotificationManager
+import androidx.compose.material3.CircularProgressIndicator
 
 @Composable
 fun HomeScreen(
@@ -90,8 +91,10 @@ fun HomeScreen(
     val currentDate = PlatformDate()
     val localDb = ServiceLocator.localDatabaseManager
     val coroutineScope = rememberCoroutineScope()
+    val syncManager = ServiceLocator.syncManager
 
-    var showSettings by remember {mutableStateOf(false)}
+    var isLoading by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
 
     var isLeftSwipeActive by remember { mutableStateOf(false) }
     var isRightSwipeActive by remember { mutableStateOf(false) }
@@ -109,8 +112,16 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         try {
             localDb.deleteSetting("init_load")
+
+            isLoading = true
+            val needsSync = syncManager.syncIfNeeded()
+            if (needsSync) {
+                delay(100)
+            }
+            isLoading = false
         } catch (e: Exception) {
-            println("ERROR: Failed to delete init_load setting: ${e.message}")
+            println("ERROR: Failed to sync or delete init_load setting: ${e.message}")
+            isLoading = false
         }
     }
 
@@ -285,22 +296,46 @@ fun HomeScreen(
                     modifier = Modifier.align(Alignment.Bottom)
                 )
 
-                Box(
-                    modifier = Modifier
-                        .background(
-                            color = LightOrange,
-                            shape = CircleShape
-                        )
-                ){
-                    SettingsButton(
-                        isSettingsOpen = showSettings,
-                        onClick = {showSettings = true}
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (isLoading) {
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .background(Color.White, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = DarkGreen,
+                                strokeWidth = 4.dp
+                            )
+                        }
+                    }
 
-                    if (showSettings) {
-                        SettingsCard(
-                            onDismiss = { showSettings = false }
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = LightOrange,
+                                shape = CircleShape
+                            )
+                    ) {
+                        SettingsButton(
+                            isSettingsOpen = showSettings,
+                            onClick = {
+                                if (!isLoading) {
+                                    showSettings = true
+                                }
+                            }
                         )
+
+                        if (showSettings) {
+                            SettingsCard(
+                                onDismiss = { showSettings = false }
+                            )
+                        }
                     }
                 }
             }
