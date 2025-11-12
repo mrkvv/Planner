@@ -1,3 +1,6 @@
+@file:OptIn(ExperimentalComposeLibrary::class)
+
+import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -7,6 +10,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.sqldelight)
+    id("org.jetbrains.kotlinx.kover") version "0.9.3"
 }
 
 kotlin {
@@ -15,7 +19,9 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
-    
+
+    jvm("desktop")
+
     listOf(
         iosArm64(),
         iosSimulatorArm64()
@@ -27,6 +33,15 @@ kotlin {
     }
     
     sourceSets {
+        val desktopMain by getting
+
+        val desktopTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation("app.cash.sqldelight:sqlite-driver:2.1.0")
+            }
+        }
+
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
@@ -63,6 +78,15 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+            implementation(kotlin("test-annotations-common"))
+            implementation(libs.assertk)
+            implementation(compose.uiTest)
+
+            implementation(libs.runtime)
+            implementation(libs.coroutines.test)
+        }
+        desktopMain.dependencies {
+            implementation(compose.desktop.currentOs)
         }
     }
 }
