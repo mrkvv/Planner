@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -497,7 +498,8 @@ fun StickyNotePage(
         }
     ) {
         Box(
-            modifier = Modifier.aspectRatio(1f),
+            modifier = Modifier.aspectRatio(1f)
+                .testTag("StickyNoteDialog"),
             contentAlignment = Alignment.BottomEnd
         ) {
             Icon(
