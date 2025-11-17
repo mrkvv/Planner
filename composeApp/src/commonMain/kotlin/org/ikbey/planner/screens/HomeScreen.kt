@@ -115,6 +115,9 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         try {
             isLoading = true
+            val maxId = localDb.getMaxNoteId()
+            initializeNoteIdCounter(maxId)
+
             val needsSync = syncManager.syncIfNeeded()
             if (needsSync) {
                 delay(100)
@@ -122,7 +125,7 @@ fun HomeScreen(
             isLoading = false
             syncTrigger++
         } catch (e: Exception) {
-            println("ERROR: Failed to sync or delete init_load setting: ${e.message}")
+            println("ERROR: Failed to sync or initialize note ID counter: ${e.message}")
             isLoading = false
         }
     }
