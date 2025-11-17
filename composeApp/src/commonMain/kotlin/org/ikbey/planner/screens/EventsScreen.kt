@@ -64,12 +64,14 @@ fun EventsScreen(
 
     var showSettings by remember {mutableStateOf(false)}
     var showFilters by remember {mutableStateOf(false)}
-    var isSwipeActive by remember { mutableStateOf(false) }
+
 
     val calendarEvents = remember { mutableStateOf(emptyList<CalendarEvent>()) }
     val filteredEvents = remember { mutableStateOf(emptyList<CalendarEvent>()) }
 
     val selectedFilters by remember { mutableStateOf(FilterManager.selectedFilters) }
+
+    var isSwipeActive by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         val allEvents = localDb.getCalendarEvents()
