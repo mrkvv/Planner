@@ -110,7 +110,7 @@ fun HomeScreen(
     val scrollState = rememberScrollState()
 
     var syncTrigger by remember { mutableStateOf(0) }
-
+    var settingsCloseTrigger by remember { mutableStateOf(0) }
 
     LaunchedEffect(Unit) {
         try {
@@ -127,7 +127,7 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(selectedYear, selectedMonth, selectedDay, isListChanged, syncTrigger) {
+    LaunchedEffect(selectedYear, selectedMonth, selectedDay, isListChanged, syncTrigger, settingsCloseTrigger) {
         try {
             val date = formatDate(selectedYear, selectedMonth, selectedDay)
             val loadedNotes = localDb.getUserNotesByDate(date)
@@ -140,7 +140,7 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(selectedYear, selectedMonth, selectedDay, syncTrigger) {
+    LaunchedEffect(selectedYear, selectedMonth, selectedDay, syncTrigger, settingsCloseTrigger) {
         try {
             val date = formatDate(selectedYear, selectedMonth, selectedDay)
             val loadedSchedules = localDb.getUserScheduleByDate(date)
@@ -150,7 +150,7 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(selectedYear, selectedMonth, selectedDay, syncTrigger) {
+    LaunchedEffect(selectedYear, selectedMonth, selectedDay, syncTrigger, settingsCloseTrigger) {
         try {
             val date = formatDate(selectedYear, selectedMonth, selectedDay)
             val loadedEvents = localDb.getTrackedCalendarEventsByDate(date)
@@ -335,7 +335,10 @@ fun HomeScreen(
 
                         if (showSettings) {
                             SettingsCard(
-                                onDismiss = { showSettings = false }
+                                onDismiss = {
+                                    showSettings = false
+                                    settingsCloseTrigger++
+                                }
                             )
                         }
                     }
