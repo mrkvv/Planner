@@ -39,6 +39,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("app.cash.sqldelight:sqlite-driver:2.1.0")
+                implementation(libs.ktor.client.okhttp)
             }
         }
 
@@ -87,6 +88,7 @@ kotlin {
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
+            implementation(libs.ktor.client.okhttp)
         }
     }
 }
