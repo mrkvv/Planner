@@ -124,8 +124,8 @@ fun org.ikbey.planner.dataBase.CalendarEvent.toNoteData(): NoteData {
         if (!location.isNullOrEmpty()) {
             append("\nМесто: $location")
         }
-        if (creator.isNotEmpty()) {
-            append("\nОрганизатор: $creator")
+        if (calendar_name.isNotEmpty()) {
+            append("\nОрганизатор: $calendar_name")
         }
     }
 
@@ -150,9 +150,9 @@ fun org.ikbey.planner.dataBase.CalendarEvent.toNote(): Note {
             if (!description.isNullOrEmpty()) append("\n")
             append("Место: $location")
         }
-        if (creator.isNotEmpty()) {
+        if (calendar_name.isNotEmpty()) {
             if (!description.isNullOrEmpty() || !location.isNullOrEmpty()) append("\n")
-            append("Организатор: $creator")
+            append("Организатор: $calendar_name")
         }
     }
 
