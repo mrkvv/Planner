@@ -13,13 +13,22 @@ package org.ikbey.planner.dataBase
  * - ServiceLocator.supabaseRepository врядли понадобится, нужны будут только localdb и для настроек syncManager
  * */
 object ServiceLocator {
-    val localDatabaseManager: LocalDatabaseManager by lazy {
-        LocalDatabaseManager(DatabaseFactory.createDatabase())
-    }
+    private var _localDatabaseManager: LocalDatabaseManager? = null
+
+    val localDatabaseManager: LocalDatabaseManager
+        get() = _localDatabaseManager ?: LocalDatabaseManager(DatabaseFactory.createDatabase()).also {
+            _localDatabaseManager = it
+        }
+
     val supabaseRepository: SupabaseRepository by lazy {
         SupabaseRepository()
     }
+
     val syncManager: SyncManager by lazy {
         SyncManager(localDatabaseManager, supabaseRepository)
+    }
+
+    fun setLocalDb(localdb: LocalDatabaseManager) {
+        _localDatabaseManager = localdb
     }
 }
