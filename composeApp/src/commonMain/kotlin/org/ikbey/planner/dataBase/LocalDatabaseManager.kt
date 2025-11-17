@@ -394,6 +394,17 @@ class LocalDatabaseManager(private val database: LocalDatabase) {
         }
     }
 
+    suspend fun getMaxNoteId() : Int {
+        val notes = this.getAllUserNotes()
+        var maxId = 0
+        for (note in notes) {
+            if(maxId < note.id) {
+                maxId = note.id
+            }
+        }
+        return maxId
+    }
+
     suspend fun deleteUserNote(id: Int) {
         withContext(Dispatchers.IO) {
             query.deleteUserNote(id.toLong())

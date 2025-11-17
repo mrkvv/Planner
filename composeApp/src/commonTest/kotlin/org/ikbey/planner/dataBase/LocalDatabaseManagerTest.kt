@@ -165,6 +165,8 @@ abstract class AbstractLocalDatabaseManagerTest {
         assertEquals(true, allNotes[1].is_done)
         assertEquals(1, notesByDate.size)
 
+        assertEquals(4, manager.getMaxNoteId())
+
         manager.deleteUserNote(4)
         allNotes = manager.getAllUserNotes()
         assertEquals(3, allNotes.size)
