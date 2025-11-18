@@ -86,6 +86,36 @@ kotlin {
             implementation(libs.runtime)
             implementation(libs.coroutines.test)
         }
+
+        val androidUnitTest by getting {
+            dependencies {
+                implementation(libs.kotlin.test)
+                implementation(libs.kotlin.test.junit)
+
+                // MockK для Android
+                implementation(libs.mockk)
+                implementation(libs.mockk.android)
+                implementation(libs.mockk.agent)
+
+                // Android тестирование
+                implementation(libs.robolectric)
+                implementation(libs.androidx.test.core)
+                implementation(libs.androidx.test.junit)
+                implementation(libs.androidx.test.runner)
+                implementation(libs.kotlinx.coroutines.test)
+                implementation("androidx.core:core-ktx:1.12.0")
+
+                // Для мокирования Android классов
+                implementation("androidx.test:core:1.5.0")
+                implementation("org.robolectric:robolectric:4.11.1")
+            }
+        }
+
+        iosMain.dependencies {
+            implementation(libs.ktor.client.darwin)
+            implementation(libs.native.driver)
+        }
+
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.ktor.client.okhttp)
@@ -103,7 +133,16 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"

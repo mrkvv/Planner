@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.window.DialogProperties
@@ -508,7 +509,7 @@ fun SettingsButton(
                 else {
                     getIcon(IconType.SETTINGS_CLOSED)
                 },
-            contentDescription = null,
+            contentDescription = "Настройки",
             modifier = Modifier.size(44.dp),
             tint = DarkGreen
         )
