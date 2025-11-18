@@ -6,6 +6,8 @@ import org.ikbey.planner.localDB.LocalDatabase
 import org.ikbey.planner.screens.AbstractEventsScreenTest
 import org.ikbey.planner.screens.AbstractSettingsScreenTest
 import org.ikbey.planner.screens.AbstractUIMonthScreenTest
+import org.ikbey.planner.screens.*
+
 
 class SyncManagerTest : AbstractSyncManagerTest() {
     override fun createDriver(): SqlDriver {
@@ -40,6 +42,22 @@ class EventsScreenTest : AbstractEventsScreenTest() {
 }
 
 class SettingsCardTest : AbstractSettingsScreenTest() {
+    override fun createDriver(): SqlDriver {
+        return JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).apply {
+            LocalDatabase.Schema.create(this)
+        }
+    }
+}
+
+class UIHomeScreenTest : AbstractUIHomeScreenTest() {
+    override fun createDriver(): SqlDriver {
+        return JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).apply {
+            LocalDatabase.Schema.create(this)
+        }
+    }
+}
+
+class HomeScreenComponentsTest : AbstractHomeScreenComponentsTest() {
     override fun createDriver(): SqlDriver {
         return JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).apply {
             LocalDatabase.Schema.create(this)

@@ -1,5 +1,6 @@
 package org.ikbey.planner.screens
 
+import androidx.annotation.VisibleForTesting
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -76,6 +77,8 @@ import kotlinx.coroutines.launch
 import org.ikbey.planner.dataBase.*
 import org.ikbey.planner.notification.NotificationManager
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.platform.testTag
+import org.ikbey.planner.CalendarManager
 
 @Composable
 fun HomeScreen(
@@ -115,6 +118,9 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         try {
             isLoading = true
+            val maxId = localDb.getMaxNoteId()
+            initializeNoteIdCounter(maxId)
+
             val needsSync = syncManager.syncIfNeeded()
             if (needsSync) {
                 delay(100)
@@ -122,7 +128,7 @@ fun HomeScreen(
             isLoading = false
             syncTrigger++
         } catch (e: Exception) {
-            println("ERROR: Failed to sync or delete init_load setting: ${e.message}")
+            println("ERROR: Failed to sync or initialize note ID counter: ${e.message}")
             isLoading = false
         }
     }
@@ -258,6 +264,7 @@ fun HomeScreen(
                     }
                 )
             }
+            .testTag("home-screen-container")
     ) {
         if (isLeftSwipeActive) {
             Box(
@@ -696,6 +703,7 @@ fun NoteCard(
 
         Box(
             modifier = Modifier
+                .testTag("toggle-done-${note.id}")
                 .size(25.dp)
                 .align(Alignment.CenterEnd)
                 .offset(x = (-5).dp)
@@ -1072,7 +1080,7 @@ fun EditableNoteDetailDialog(
                                 intervalError =
                                     isInterval && !isValidTimeInterval(startTime, endTime)
                             },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f).testTag("note-input-field")
                         )
                     }
 
@@ -1185,6 +1193,7 @@ fun EditableNoteDetailDialog(
                         },
                         placeholder = "Заголовок",
                         modifier = Modifier
+                            .testTag("note-input-field")
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp)
                             .height(250.dp)
@@ -1232,7 +1241,9 @@ fun EditableNoteDetailDialog(
                             Icon(
                                 imageVector = Icons.trash,
                                 contentDescription = "Удалить заметку",
-                                modifier = Modifier.size(24.dp),
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .testTag("delete-note-button"),
                                 tint = DarkGreen
                             )
                         }
@@ -1263,7 +1274,9 @@ private fun timeToMinutes(time: String?): Int {
         Int.MAX_VALUE
     }
 }
-private fun createUpdatedNote(
+
+@VisibleForTesting
+internal fun createUpdatedNote(
     originalNote: Note,
     startTime: String,
     endTime: String,
@@ -1297,7 +1310,8 @@ private fun createUpdatedNote(
 }
 
 
-private fun compareNotesAdvanced(note1: Note, note2: Note): Int {
+@VisibleForTesting
+internal fun compareNotesAdvanced(note1: Note, note2: Note): Int {
     val time1 = note1.start_time ?: ""
     val time2 = note2.start_time ?: ""
 

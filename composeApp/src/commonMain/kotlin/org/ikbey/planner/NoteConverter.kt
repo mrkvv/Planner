@@ -3,6 +3,17 @@ package org.ikbey.planner
 import org.ikbey.planner.dataBase.Note
 import kotlin.random.Random
 
+private var lastNoteId = 0
+
+fun initializeNoteIdCounter(maxId: Int) {
+    lastNoteId = maxId
+}
+
+private fun getNextNoteId(): Int {
+    lastNoteId++
+    return lastNoteId
+}
+
 fun formatDate(year: Int, month: Int, day: Int): String {
     val monthStr = if (month < 10) "0$month" else "$month"
     val dayStr = if (day < 10) "0$day" else "$day"
@@ -19,7 +30,7 @@ fun formatTime(timeString: String): String {
 }
 
 fun generateNoteId(): Int {
-    return Random.nextInt(1000, 9999)
+    return getNextNoteId()
 }
 
 fun NoteData.toUserNote(): Note {
